@@ -741,15 +741,15 @@ func ApiValidatorQueue(w http.ResponseWriter, r *http.Request) {
 	returnQueryResults(rows, w, r)
 }
 
-// ApiValidatorsStates godoc
-// @Summary Get the all validators states summary
+// ApiValidatorsStatusSummary godoc
+// @Summary Get the all validators status summary
 // @Tags Validator
-// @Description Returns the summary value of the various states of the validators
+// @Description Returns the summary value of the various status of the validators
 // @Produce  json
 // @Success 200 {object} types.ApiResponse{data=types.ValidatorsPageData}
 // @Failure 400 {object} types.ApiResponse
-// @Router /api/v1/validators/states [get]
-func ApiValidatorsStates(w http.ResponseWriter, r *http.Request) {
+// @Router /api/v1/validators/statussummary [get]
+func ApiValidatorsStatusSummary(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	// TODO(Leo): 需要走redis缓存, 或者参考 getRocketpoolStats()
@@ -773,7 +773,7 @@ func ApiValidatorsStates(w http.ResponseWriter, r *http.Request) {
 	qry := "SELECT status AS statename, COUNT(*) AS statecount FROM validators GROUP BY status"
 	err := db.ReaderDb.Select(&currentStateCounts, qry)
 	if err != nil {
-		sendErrorResponse(w, r.URL.String(), "could not get validators states")
+		sendErrorResponse(w, r.URL.String(), "could not get validators status summary")
 		return
 	}
 
@@ -810,6 +810,22 @@ func ApiValidatorsStates(w http.ResponseWriter, r *http.Request) {
 
 
 	sendOKResponse(j, r.URL.String(), []interface{}{validatorsPageData})
+}
+
+// ApiValidatorsStats godoc
+// @Summary Get the validators stats
+// @Tags Validator
+// @Description Returns the stats of the validators
+// @Produce  json
+// @Success 200 {object} types.ApiResponse{data=types.Stats}
+// @Failure 400 {object} types.ApiResponse
+// @Router /api/v1/validators/stats [get]
+func ApiValidatorsStats(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	j := json.NewEncoder(w)
+	stats := services.GetLatestStats()
+	sendOKResponse(j, r.URL.String(), []interface{}{stats})
 }
 
 // ApiRocketpoolStats godoc
