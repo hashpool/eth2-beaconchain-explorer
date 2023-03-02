@@ -714,7 +714,7 @@ func SaveEpoch(data *types.EpochData, client rpc.Client) error {
 				logger.Errorf("error updating queue deposits cache: %v", err)
 			}
 
-			if data.Epoch%9 == 0 { // update the validator performance every hour
+			if data.Epoch%9 == 0 && BigtableClient != nil{ // update the validator performance every hour
 				err = updateValidatorPerformance(validatorsTx)
 				if err != nil {
 					logger.Errorf("error updating validator performance: %v", err)
@@ -933,9 +933,9 @@ func saveValidators(data *types.EpochData, tx *sqlx.Tx, client rpc.Client) error
 		metrics.TaskDuration.WithLabelValues("db_save_validators").Observe(time.Since(start).Seconds())
 	}()
 
-	var genesisBalances map[uint64][]*types.ValidatorBalance
+	var genesisBalances map[uint64][]*types.ValidatorBalance = make(map[uint64][]*types.ValidatorBalance, 1)
 
-	if data.Epoch == 0 {
+	if data.Epoch == 0 && BigtableClient != nil{
 		var err error
 		genesisBalances, err = BigtableClient.GetValidatorBalanceHistory([]uint64{}, 0, 1)
 		if err != nil {
@@ -1258,7 +1258,7 @@ func saveValidators(data *types.EpochData, tx *sqlx.Tx, client rpc.Client) error
 		}
 
 		var balance map[uint64][]*types.ValidatorBalance
-		if newValidator.ActivationEpoch == 0 {
+		if newValidator.ActivationEpoch == 0 || BigtableClient == nil {
 			balance = genesisBalances
 		} else {
 			balance, err = BigtableClient.GetValidatorBalanceHistory([]uint64{newValidator.Validatorindex}, newValidator.ActivationEpoch, 1)

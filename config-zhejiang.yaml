@@ -18,7 +18,8 @@ chain:
 # Note: It is possible to run either the frontend or the indexer or both at the same time
 # Frontend config
 frontend:
-  enabled: false # Enable or disable to web frontend
+  enabled: true # Enable or disable to web frontend
+  onlyAPI: true
   imprint: "./imprint.html"  # Path to the imprint page content
   siteName: "Kintsugi Explorer" # Name of the site, displayed in the title tag
   siteSubtitle: "Kintsugi explorer" # Subtitle shown on the main page
@@ -46,8 +47,8 @@ frontend:
 # Indexer config
 indexer:
   enabled: true # Enable or disable the indexing service
-  fullIndexOnStartup: true # Perform a one time full db index on startup
-  indexMissingEpochsOnStartup: true # Check for missing epochs and export them after startup
+  fullIndexOnStartup: false # Perform a one time full db index on startup
+  indexMissingEpochsOnStartup: false # Check for missing epochs and export them after startup
   node:
     host: "192.168.66.130" # Address of the backend node
     port: "5052" # GRPC port of the Prysm node
@@ -57,6 +58,11 @@ indexer:
   eth1DepositContractAddress: '0x4242424242424242424242424242424242424242'
   # Note: 0 is correct, but due to an underflow bug (being fixed), doesn't work.
   eth1DepositContractFirstBlock: 1
+  onetimeexport:
+    enabled: false
+#    epochs: 6400
+    startEpoch: 6453
+    endEpoch: 6454
 
 eth1ErigonEndpoint: "http://192.168.66.130:8545"
 eth1GethEndpoint: "http://192.168.66.130:8545"
@@ -65,3 +71,6 @@ tieredCacheProvider: 'redis'
 bigtable:
   project: explorer
   instance: bigtable:9000
+lastAttestationCachePath: "/Users/leozhang/workspace/coins/eth/eth2/explorer-data"
+
+

@@ -9,13 +9,13 @@ import (
 	"eth2-exporter/types"
 	"eth2-exporter/utils"
 	"fmt"
+	"golang.org/x/sync/errgroup"
 	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
 )
 
 var logger = logrus.New().WithField("module", "exporter")
@@ -34,8 +34,8 @@ func Start(client rpc.Client) error {
 	go eth1DepositsExporter()
 	go genesisDepositsExporter()
 	go checkSubscriptions()
-	go syncCommitteesExporter(client)
-	go syncCommitteesCountExporter()
+	//go syncCommitteesExporter(client)
+	//go syncCommitteesCountExporter()
 	if utils.Config.SSVExporter.Enabled {
 		go ssvExporter()
 	}
@@ -258,16 +258,18 @@ func Start(client rpc.Client) error {
 		}
 		blocksMap[block.Slot][fmt.Sprintf("%x", block.BlockRoot)] = block
 
-		err := db.BigtableClient.SaveAttestations(blocksMap)
-		if err != nil {
-			logrus.Errorf("error exporting attestations to bigtable for block %v: %v", block.Slot, err)
-		}
-		err = db.BigtableClient.SaveSyncComitteeDuties(blocksMap)
-		if err != nil {
-			logrus.Errorf("error exporting sync committee duties to bigtable for block %v: %v", block.Slot, err)
+		if db.BigtableClient != nil {
+			err := db.BigtableClient.SaveAttestations(blocksMap)
+			if err != nil {
+				logrus.Errorf("error exporting attestations to bigtable for block %v: %v", block.Slot, err)
+			}
+			err = db.BigtableClient.SaveSyncComitteeDuties(blocksMap)
+			if err != nil {
+				logrus.Errorf("error exporting sync committee duties to bigtable for block %v: %v", block.Slot, err)
+			}
 		}
 
-		err = db.SaveBlock(block)
+		err := db.SaveBlock(block)
 		if err != nil {
 			logger.Errorf("error saving block: %v", err)
 		}
@@ -514,75 +516,77 @@ func ExportEpoch(epoch uint64, client rpc.Client) error {
 		return fmt.Errorf("error retrieving epoch data: no validators received for epoch")
 	}
 
-	// export epoch data to bigtable
-	g := new(errgroup.Group)
-	g.SetLimit(7)
-	g.Go(func() error {
-		err = db.BigtableClient.SaveValidatorBalances(epoch, data.Validators)
-		if err != nil {
-			return fmt.Errorf("error exporting validator balances to bigtable: %v", err)
-		}
-		return nil
-	})
-	g.Go(func() error {
-		err = db.BigtableClient.SaveAttestationAssignments(epoch, data.ValidatorAssignmentes.AttestorAssignments)
-		if err != nil {
-			return fmt.Errorf("error exporting attestation assignments to bigtable: %v", err)
-		}
-		return nil
-	})
-	g.Go(func() error {
-		err = db.BigtableClient.SaveProposalAssignments(epoch, data.ValidatorAssignmentes.ProposerAssignments)
-		if err != nil {
-			return fmt.Errorf("error exporting proposal assignments to bigtable: %v", err)
-		}
-		return nil
-	})
-	g.Go(func() error {
-		err = db.BigtableClient.SaveAttestations(data.Blocks)
-		if err != nil {
-			return fmt.Errorf("error exporting attestations to bigtable: %v", err)
-		}
-		return nil
-	})
-	g.Go(func() error {
-		err = db.BigtableClient.SaveProposals(data.Blocks)
-		if err != nil {
-			return fmt.Errorf("error exporting proposals to bigtable: %v", err)
-		}
-		return nil
-	})
-	g.Go(func() error {
-		err = db.BigtableClient.SaveSyncComitteeDuties(data.Blocks)
-		if err != nil {
-			return fmt.Errorf("error exporting sync committee duties to bigtable: %v", err)
-		}
-		return nil
-	})
-	g.Go(func() error {
-		attestedSlots := make(map[uint64]uint64)
-		for _, blockkv := range data.Blocks {
-			for _, block := range blockkv {
-				for _, attestation := range block.Attestations {
-					for _, validator := range attestation.Attesters {
-						if block.Slot > attestedSlots[validator] {
-							attestedSlots[validator] = block.Slot
+	//export epoch data to bigtable
+	if db.BigtableClient != nil {
+		g := new(errgroup.Group)
+		g.SetLimit(7)
+		g.Go(func() error {
+			err = db.BigtableClient.SaveValidatorBalances(epoch, data.Validators)
+			if err != nil {
+				return fmt.Errorf("error exporting validator balances to bigtable: %v", err)
+			}
+			return nil
+		})
+		g.Go(func() error {
+			err = db.BigtableClient.SaveAttestationAssignments(epoch, data.ValidatorAssignmentes.AttestorAssignments)
+			if err != nil {
+				return fmt.Errorf("error exporting attestation assignments to bigtable: %v", err)
+			}
+			return nil
+		})
+		g.Go(func() error {
+			err = db.BigtableClient.SaveProposalAssignments(epoch, data.ValidatorAssignmentes.ProposerAssignments)
+			if err != nil {
+				return fmt.Errorf("error exporting proposal assignments to bigtable: %v", err)
+			}
+			return nil
+		})
+		g.Go(func() error {
+			err = db.BigtableClient.SaveAttestations(data.Blocks)
+			if err != nil {
+				return fmt.Errorf("error exporting attestations to bigtable: %v", err)
+			}
+			return nil
+		})
+		g.Go(func() error {
+			err = db.BigtableClient.SaveProposals(data.Blocks)
+			if err != nil {
+				return fmt.Errorf("error exporting proposals to bigtable: %v", err)
+			}
+			return nil
+		})
+		g.Go(func() error {
+			err = db.BigtableClient.SaveSyncComitteeDuties(data.Blocks)
+			if err != nil {
+				return fmt.Errorf("error exporting sync committee duties to bigtable: %v", err)
+			}
+			return nil
+		})
+		g.Go(func() error {
+			attestedSlots := make(map[uint64]uint64)
+			for _, blockkv := range data.Blocks {
+				for _, block := range blockkv {
+					for _, attestation := range block.Attestations {
+						for _, validator := range attestation.Attesters {
+							if block.Slot > attestedSlots[validator] {
+								attestedSlots[validator] = block.Slot
+							}
 						}
 					}
 				}
 			}
-		}
 
-		err = services.SetLastAttestationSlots(attestedSlots)
+			err = services.SetLastAttestationSlots(attestedSlots)
+			if err != nil {
+				return fmt.Errorf("error settings last attestation slots for epoch %v: %v", data.Epoch, err)
+			}
+			return nil
+		})
+
+		err = g.Wait()
 		if err != nil {
-			return fmt.Errorf("error settings last attestation slots for epoch %v: %v", data.Epoch, err)
+			return fmt.Errorf("error during bigtable export: %w", err)
 		}
-		return nil
-	})
-
-	err = g.Wait()
-	if err != nil {
-		return fmt.Errorf("error during bigtable export: %w", err)
 	}
 
 	// at this point all epoch data has been written to bigtable
