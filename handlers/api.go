@@ -741,6 +741,77 @@ func ApiValidatorQueue(w http.ResponseWriter, r *http.Request) {
 	returnQueryResults(rows, w, r)
 }
 
+// ApiValidatorsStates godoc
+// @Summary Get the all validators states summary
+// @Tags Validator
+// @Description Returns the summary value of the various states of the validators
+// @Produce  json
+// @Success 200 {object} types.ApiResponse{data=types.ValidatorsPageData}
+// @Failure 400 {object} types.ApiResponse
+// @Router /api/v1/validators/states [get]
+func ApiValidatorsStates(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// TODO(Leo): 需要走redis缓存, 或者参考 getRocketpoolStats()
+	j := json.NewEncoder(w)
+	validatorsPageData := types.ValidatorsPageData{}
+	validatorsPageData.PendingCount = 0
+	validatorsPageData.ActiveOnlineCount = 0
+	validatorsPageData.ActiveOfflineCount = 0
+	validatorsPageData.ActiveCount = 0
+	validatorsPageData.SlashingOnlineCount = 0
+	validatorsPageData.SlashingOfflineCount = 0
+	validatorsPageData.SlashingCount = 0
+	validatorsPageData.ExitingOnlineCount = 0
+	validatorsPageData.ExitingOfflineCount = 0
+	validatorsPageData.ExitedCount = 0
+	validatorsPageData.VoluntaryExitsCount = 0
+	validatorsPageData.DepositedCount = 0
+
+	var currentStateCounts []*states
+
+	qry := "SELECT status AS statename, COUNT(*) AS statecount FROM validators GROUP BY status"
+	err := db.ReaderDb.Select(&currentStateCounts, qry)
+	if err != nil {
+		sendErrorResponse(w, r.URL.String(), "could not get validators states")
+		return
+	}
+
+	for _, state := range currentStateCounts {
+		switch state.Name {
+		case "pending":
+			validatorsPageData.PendingCount = state.Count
+		case "active_online":
+			validatorsPageData.ActiveOnlineCount = state.Count
+		case "active_offline":
+			validatorsPageData.ActiveOfflineCount = state.Count
+		case "slashing_online":
+			validatorsPageData.SlashingOnlineCount = state.Count
+		case "slashing_offline":
+			validatorsPageData.SlashingOfflineCount = state.Count
+		case "slashed":
+			validatorsPageData.Slashed = state.Count
+		case "exiting_online":
+			validatorsPageData.ExitingOnlineCount = state.Count
+		case "exiting_offline":
+			validatorsPageData.ExitingOfflineCount = state.Count
+		case "exited":
+			validatorsPageData.VoluntaryExitsCount = state.Count
+		case "deposited":
+			validatorsPageData.DepositedCount = state.Count
+		}
+	}
+
+	validatorsPageData.ActiveCount = validatorsPageData.ActiveOnlineCount + validatorsPageData.ActiveOfflineCount
+	validatorsPageData.SlashingCount = validatorsPageData.SlashingOnlineCount + validatorsPageData.SlashingOfflineCount
+	validatorsPageData.ExitingCount = validatorsPageData.ExitingOnlineCount + validatorsPageData.ExitingOfflineCount
+	validatorsPageData.ExitedCount = validatorsPageData.VoluntaryExitsCount + validatorsPageData.Slashed
+	validatorsPageData.TotalCount = validatorsPageData.ActiveCount + validatorsPageData.ExitingCount + validatorsPageData.ExitedCount + validatorsPageData.PendingCount + validatorsPageData.DepositedCount
+
+
+	sendOKResponse(j, r.URL.String(), []interface{}{validatorsPageData})
+}
+
 // ApiRocketpoolStats godoc
 // @Summary Get global rocketpool network statistics
 // @Tags Rocketpool
