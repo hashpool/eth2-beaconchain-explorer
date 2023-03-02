@@ -367,9 +367,9 @@ func main() {
 		router.HandleFunc("/api/healthz", handlers.ApiHealthz).Methods("GET", "HEAD")
 		router.HandleFunc("/api/healthz-loadbalancer", handlers.ApiHealthzLoadbalancer).Methods("GET", "HEAD")
 
-		// logrus.Infof("initializing frontend services")
-		// services.Init() // Init frontend services
-		// logrus.Infof("frontend services initiated")
+		logrus.Infof("initializing frontend services")
+		services.Init() // Init frontend services
+		logrus.Infof("frontend services initiated")
 
 		logrus.Infof("initializing prices")
 		price.Init(utils.Config.Chain.Config.DepositChainID)

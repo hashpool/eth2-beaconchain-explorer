@@ -42,11 +42,11 @@ func Init() {
 	ready.Add(1)
 	go slotUpdater(ready)
 
-	ready.Add(1)
-	go latestProposedSlotUpdater(ready)
+	//ready.Add(1)
+	//go latestProposedSlotUpdater(ready)
 
-	ready.Add(1)
-	go latestBlockUpdater(ready)
+	//ready.Add(1)
+	//go latestBlockUpdater(ready)
 
 	ready.Add(1)
 	go slotVizUpdater(ready)
@@ -54,32 +54,32 @@ func Init() {
 	ready.Add(1)
 	go indexPageDataUpdater(ready)
 
-	ready.Add(1)
-	go poolsUpdater(ready)
+	//ready.Add(1)
+	//go poolsUpdater(ready)
 
-	ready.Add(1)
-	go relaysUpdater(ready)
+	//ready.Add(1)
+	//go relaysUpdater(ready)
 
-	ready.Add(1)
-	go chartsPageDataUpdater(ready)
+	//ready.Add(1)
+	//go chartsPageDataUpdater(ready)
 
 	ready.Add(1)
 	go statsUpdater(ready)
 
-	ready.Add(1)
-	go mempoolUpdater(ready)
+	//ready.Add(1)
+	//go mempoolUpdater(ready)
 
-	ready.Add(1)
-	go burnUpdater(ready)
+	//ready.Add(1)
+	//go burnUpdater(ready)
 
-	ready.Add(1)
-	go gasNowUpdater(ready)
+	//ready.Add(1)
+	//go gasNowUpdater(ready)
 
-	ready.Add(1)
-	go ethStoreStatisticsDataUpdater(ready)
+	//ready.Add(1)
+	//go ethStoreStatisticsDataUpdater(ready)
 
-	ready.Add(1)
-	go startMonitoringService(ready)
+	//ready.Add(1)
+	//go startMonitoringService(ready)
 
 	ready.Wait()
 }
