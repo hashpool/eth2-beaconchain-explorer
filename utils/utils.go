@@ -25,6 +25,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -36,6 +37,7 @@ import (
 
 	"github.com/asaskevich/govalidator"
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/kataras/i18n"
 	"github.com/kelseyhightower/envconfig"
@@ -122,6 +124,7 @@ func GetTemplateFuncs() template.FuncMap {
 		"formatETH":                               FormatETH,
 		"formatFloat":                             FormatFloat,
 		"formatAmount":                            FormatAmount,
+		"formatBigAmount":                         FormatBigAmount,
 		"formatYesNo":                             FormatYesNo,
 		"formatAmountFormatted":                   FormatAmountFormated,
 		"formatAddressAsLink":                     FormatAddressAsLink,
@@ -207,11 +210,18 @@ func GetTemplateFuncs() template.FuncMap {
 		"byteToString": func(num []byte) string {
 			return string(num)
 		},
-		"formatEthstoreComparison": FormatEthstoreComparison,
-		"formatPoolPerformance":    FormatPoolPerformance,
-		"formatTokenSymbolTitle":   FormatTokenSymbolTitle,
-		"formatTokenSymbol":        FormatTokenSymbol,
-		"formatTokenSymbolHTML":    FormatTokenSymbolHTML,
+		"bigToInt": func(val *hexutil.Big) *big.Int {
+			if val != nil {
+				return val.ToInt()
+			}
+			return nil
+		},
+		"formatBigNumberAddCommasFormated": FormatBigNumberAddCommasFormated,
+		"formatEthstoreComparison":         FormatEthstoreComparison,
+		"formatPoolPerformance":            FormatPoolPerformance,
+		"formatTokenSymbolTitle":           FormatTokenSymbolTitle,
+		"formatTokenSymbol":                FormatTokenSymbol,
+		"formatTokenSymbolHTML":            FormatTokenSymbolHTML,
 		"dict": func(values ...interface{}) (map[string]interface{}, error) {
 			if len(values)%2 != 0 {
 				return nil, errors.New("invalid dict call")
@@ -499,9 +509,11 @@ func IsApiRequest(r *http.Request) bool {
 	return ok && len(query) > 0 && query[0] == "json"
 }
 
-var eth1AddressRE = regexp.MustCompile("^0?x?[0-9a-fA-F]{40}$")
-var eth1TxRE = regexp.MustCompile("^0?x?[0-9a-fA-F]{64}$")
-var zeroHashRE = regexp.MustCompile("^0?x?0+$")
+var eth1AddressRE = regexp.MustCompile("^(0x)?[0-9a-fA-F]{40}$")
+var withdrawalCredentialsRE = regexp.MustCompile("^(0x)?00[0-9a-fA-F]{62}$")
+var withdrawalCredentialsAddressRE = regexp.MustCompile("^(0x)?010000000000000000000000[0-9a-fA-F]{40}$")
+var eth1TxRE = regexp.MustCompile("^(0x)?[0-9a-fA-F]{64}$")
+var zeroHashRE = regexp.MustCompile("^(0x)?0+$")
 
 // IsValidEth1Address verifies whether a string represents a valid eth1-address.
 func IsValidEth1Address(s string) bool {
@@ -516,6 +528,11 @@ func IsEth1Address(s string) bool {
 // IsValidEth1Tx verifies whether a string represents a valid eth1-tx-hash.
 func IsValidEth1Tx(s string) bool {
 	return !zeroHashRE.MatchString(s) && eth1TxRE.MatchString(s)
+}
+
+// IsValidWithdrawalCredentials verifies whether a string represents valid withdrawal credentials.
+func IsValidWithdrawalCredentials(s string) bool {
+	return withdrawalCredentialsRE.MatchString(s) || withdrawalCredentialsAddressRE.MatchString(s)
 }
 
 // https://github.com/badoux/checkmail/blob/f9f80cb795fa/checkmail.go#L37
@@ -1054,4 +1071,41 @@ func ForkVersionAtEpoch(epoch uint64) *types.ForkVersion {
 		CurrentVersion:  MustParseHex(Config.Chain.Config.GenesisForkVersion),
 		PreviousVersion: MustParseHex(Config.Chain.Config.GenesisForkVersion),
 	}
+}
+
+// LogFatal logs a fatal error with callstack info that skips callerSkip many levels with arbitrarily many additional infos.
+// callerSkip equal to 0 gives you info directly where LogFatal is called.
+func LogFatal(err error, errorMsg interface{}, callerSkip int, additionalInfos ...string) {
+	logErrorInfo(err, callerSkip, additionalInfos...).Fatal(errorMsg)
+}
+
+// LogError logs an error with callstack info that skips callerSkip many levels with arbitrarily many additional infos.
+// callerSkip equal to 0 gives you info directly where LogError is called.
+func LogError(err error, errorMsg interface{}, callerSkip int, additionalInfos ...string) {
+	logErrorInfo(err, callerSkip, additionalInfos...).Error(errorMsg)
+}
+
+func logErrorInfo(err error, callerSkip int, additionalInfos ...string) *logrus.Entry {
+	logFields := logrus.NewEntry(logrus.New())
+
+	pc, fullFilePath, line, ok := runtime.Caller(callerSkip + 2)
+	if ok {
+		logFields = logFields.WithFields(logrus.Fields{
+			"cs_file":     filepath.Base(fullFilePath),
+			"cs_function": runtime.FuncForPC(pc).Name(),
+			"cs_line":     line,
+		})
+	} else {
+		logFields = logFields.WithField("runtime", "Callstack cannot be read")
+	}
+
+	if err != nil {
+		logFields = logFields.WithField("error type", fmt.Sprintf("%T", err)).WithError(err)
+	}
+
+	for idx, info := range additionalInfos {
+		logFields = logFields.WithField(fmt.Sprintf("info_%v", idx), info)
+	}
+
+	return logFields
 }

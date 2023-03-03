@@ -21,7 +21,6 @@ import (
 	gtypes "github.com/ethereum/go-ethereum/core/types"
 
 	lru "github.com/hashicorp/golang-lru"
-	"github.com/prysmaticlabs/go-bitfield"
 	"github.com/sirupsen/logrus"
 )
 
@@ -55,7 +54,7 @@ func (lc *LighthouseClient) GetNewBlockChan() chan *types.Block {
 		stream, err := eventsource.Subscribe(fmt.Sprintf("%s/eth/v1/events?topics=head", lc.endpoint), "")
 
 		if err != nil {
-			logrus.Fatal(err)
+			utils.LogFatal(err, "getting eventsource stream error", 0)
 		}
 		defer stream.Close()
 
@@ -635,9 +634,10 @@ func (lc *LighthouseClient) blockFromResponse(parsedHeaders *StandardBeaconHeade
 			DepositCount: uint64(parsedBlock.Message.Body.Eth1Data.DepositCount),
 			BlockHash:    utils.MustParseHex(parsedBlock.Message.Body.Eth1Data.BlockHash),
 		},
-		ProposerSlashings:          make([]*types.ProposerSlashing, len(parsedBlock.Message.Body.ProposerSlashings)),
-		AttesterSlashings:          make([]*types.AttesterSlashing, len(parsedBlock.Message.Body.AttesterSlashings)),
-		Attestations:               make([]*types.Attestation, len(parsedBlock.Message.Body.Attestations)),
+		//ProposerSlashings:          make([]*types.ProposerSlashing, len(parsedBlock.Message.Body.ProposerSlashings)),
+		//Attestations:               make([]*types.Attestation, len(parsedBlock.Message.Body.Attestations)),
+		AttesterSlashings:          make([]*types.AttesterSlashing, 0),
+		Attestations:               make([]*types.Attestation, 0),
 		Deposits:                   make([]*types.Deposit, len(parsedBlock.Message.Body.Deposits)),
 		VoluntaryExits:             make([]*types.VoluntaryExit, len(parsedBlock.Message.Body.VoluntaryExits)),
 		SignedBLSToExecutionChange: make([]*types.SignedBLSToExecutionChange, len(parsedBlock.Message.Body.SignedBLSToExecutionChange)),
@@ -748,6 +748,7 @@ func (lc *LighthouseClient) blockFromResponse(parsedHeaders *StandardBeaconHeade
 		}
 	}
 
+	/*
 	for i, attesterSlashing := range parsedBlock.Message.Body.AttesterSlashings {
 		block.AttesterSlashings[i] = &types.AttesterSlashing{
 			Attestation1: &types.IndexedAttestation{
@@ -826,6 +827,7 @@ func (lc *LighthouseClient) blockFromResponse(parsedHeaders *StandardBeaconHeade
 
 		block.Attestations[i] = a
 	}
+	*/
 
 	for i, deposit := range parsedBlock.Message.Body.Deposits {
 		d := &types.Deposit{
