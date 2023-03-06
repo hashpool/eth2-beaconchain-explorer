@@ -635,6 +635,7 @@ func (lc *LighthouseClient) blockFromResponse(parsedHeaders *StandardBeaconHeade
 			BlockHash:    utils.MustParseHex(parsedBlock.Message.Body.Eth1Data.BlockHash),
 		},
 		ProposerSlashings: make([]*types.ProposerSlashing, len(parsedBlock.Message.Body.ProposerSlashings)),
+		//AttesterSlashings:          make([]*types.AttesterSlashing, len(parsedBlock.Message.Body.AttesterSlashings)),
 		//Attestations:               make([]*types.Attestation, len(parsedBlock.Message.Body.Attestations)),
 		AttesterSlashings:          make([]*types.AttesterSlashing, 0),
 		Attestations:               make([]*types.Attestation, 0),
@@ -749,84 +750,84 @@ func (lc *LighthouseClient) blockFromResponse(parsedHeaders *StandardBeaconHeade
 	}
 
 	/*
-		for i, attesterSlashing := range parsedBlock.Message.Body.AttesterSlashings {
-			block.AttesterSlashings[i] = &types.AttesterSlashing{
-				Attestation1: &types.IndexedAttestation{
-					Data: &types.AttestationData{
-						Slot:            uint64(attesterSlashing.Attestation1.Data.Slot),
-						CommitteeIndex:  uint64(attesterSlashing.Attestation1.Data.Index),
-						BeaconBlockRoot: utils.MustParseHex(attesterSlashing.Attestation1.Data.BeaconBlockRoot),
-						Source: &types.Checkpoint{
-							Epoch: uint64(attesterSlashing.Attestation1.Data.Source.Epoch),
-							Root:  utils.MustParseHex(attesterSlashing.Attestation1.Data.Source.Root),
-						},
-						Target: &types.Checkpoint{
-							Epoch: uint64(attesterSlashing.Attestation1.Data.Target.Epoch),
-							Root:  utils.MustParseHex(attesterSlashing.Attestation1.Data.Target.Root),
-						},
-					},
-					Signature:        utils.MustParseHex(attesterSlashing.Attestation1.Signature),
-					AttestingIndices: uint64List(attesterSlashing.Attestation1.AttestingIndices),
-				},
-				Attestation2: &types.IndexedAttestation{
-					Data: &types.AttestationData{
-						Slot:            uint64(attesterSlashing.Attestation2.Data.Slot),
-						CommitteeIndex:  uint64(attesterSlashing.Attestation2.Data.Index),
-						BeaconBlockRoot: utils.MustParseHex(attesterSlashing.Attestation2.Data.BeaconBlockRoot),
-						Source: &types.Checkpoint{
-							Epoch: uint64(attesterSlashing.Attestation2.Data.Source.Epoch),
-							Root:  utils.MustParseHex(attesterSlashing.Attestation2.Data.Source.Root),
-						},
-						Target: &types.Checkpoint{
-							Epoch: uint64(attesterSlashing.Attestation2.Data.Target.Epoch),
-							Root:  utils.MustParseHex(attesterSlashing.Attestation2.Data.Target.Root),
-						},
-					},
-					Signature:        utils.MustParseHex(attesterSlashing.Attestation2.Signature),
-					AttestingIndices: uint64List(attesterSlashing.Attestation2.AttestingIndices),
-				},
-			}
-		}
-
-		for i, attestation := range parsedBlock.Message.Body.Attestations {
-			a := &types.Attestation{
-				AggregationBits: utils.MustParseHex(attestation.AggregationBits),
-				Attesters:       []uint64{},
+	for i, attesterSlashing := range parsedBlock.Message.Body.AttesterSlashings {
+		block.AttesterSlashings[i] = &types.AttesterSlashing{
+			Attestation1: &types.IndexedAttestation{
 				Data: &types.AttestationData{
-					Slot:            uint64(attestation.Data.Slot),
-					CommitteeIndex:  uint64(attestation.Data.Index),
-					BeaconBlockRoot: utils.MustParseHex(attestation.Data.BeaconBlockRoot),
+					Slot:            uint64(attesterSlashing.Attestation1.Data.Slot),
+					CommitteeIndex:  uint64(attesterSlashing.Attestation1.Data.Index),
+					BeaconBlockRoot: utils.MustParseHex(attesterSlashing.Attestation1.Data.BeaconBlockRoot),
 					Source: &types.Checkpoint{
-						Epoch: uint64(attestation.Data.Source.Epoch),
-						Root:  utils.MustParseHex(attestation.Data.Source.Root),
+						Epoch: uint64(attesterSlashing.Attestation1.Data.Source.Epoch),
+						Root:  utils.MustParseHex(attesterSlashing.Attestation1.Data.Source.Root),
 					},
 					Target: &types.Checkpoint{
-						Epoch: uint64(attestation.Data.Target.Epoch),
-						Root:  utils.MustParseHex(attestation.Data.Target.Root),
+						Epoch: uint64(attesterSlashing.Attestation1.Data.Target.Epoch),
+						Root:  utils.MustParseHex(attesterSlashing.Attestation1.Data.Target.Root),
 					},
 				},
-				Signature: utils.MustParseHex(attestation.Signature),
-			}
-
-			aggregationBits := bitfield.Bitlist(a.AggregationBits)
-			assignments, err := lc.GetEpochAssignments(a.Data.Slot / utils.Config.Chain.Config.SlotsPerEpoch)
-			if err != nil {
-				return nil, fmt.Errorf("error receiving epoch assignment for epoch %v: %v", a.Data.Slot/utils.Config.Chain.Config.SlotsPerEpoch, err)
-			}
-
-			for i := uint64(0); i < aggregationBits.Len(); i++ {
-				if aggregationBits.BitAt(i) {
-					validator, found := assignments.AttestorAssignments[utils.FormatAttestorAssignmentKey(a.Data.Slot, a.Data.CommitteeIndex, i)]
-					if !found { // This should never happen!
-						validator = 0
-						logger.Errorf("error retrieving assigned validator for attestation %v of block %v for slot %v committee index %v member index %v", i, block.Slot, a.Data.Slot, a.Data.CommitteeIndex, i)
-					}
-					a.Attesters = append(a.Attesters, validator)
-				}
-			}
-
-			block.Attestations[i] = a
+				Signature:        utils.MustParseHex(attesterSlashing.Attestation1.Signature),
+				AttestingIndices: uint64List(attesterSlashing.Attestation1.AttestingIndices),
+			},
+			Attestation2: &types.IndexedAttestation{
+				Data: &types.AttestationData{
+					Slot:            uint64(attesterSlashing.Attestation2.Data.Slot),
+					CommitteeIndex:  uint64(attesterSlashing.Attestation2.Data.Index),
+					BeaconBlockRoot: utils.MustParseHex(attesterSlashing.Attestation2.Data.BeaconBlockRoot),
+					Source: &types.Checkpoint{
+						Epoch: uint64(attesterSlashing.Attestation2.Data.Source.Epoch),
+						Root:  utils.MustParseHex(attesterSlashing.Attestation2.Data.Source.Root),
+					},
+					Target: &types.Checkpoint{
+						Epoch: uint64(attesterSlashing.Attestation2.Data.Target.Epoch),
+						Root:  utils.MustParseHex(attesterSlashing.Attestation2.Data.Target.Root),
+					},
+				},
+				Signature:        utils.MustParseHex(attesterSlashing.Attestation2.Signature),
+				AttestingIndices: uint64List(attesterSlashing.Attestation2.AttestingIndices),
+			},
 		}
+	}
+
+	for i, attestation := range parsedBlock.Message.Body.Attestations {
+		a := &types.Attestation{
+			AggregationBits: utils.MustParseHex(attestation.AggregationBits),
+			Attesters:       []uint64{},
+			Data: &types.AttestationData{
+				Slot:            uint64(attestation.Data.Slot),
+				CommitteeIndex:  uint64(attestation.Data.Index),
+				BeaconBlockRoot: utils.MustParseHex(attestation.Data.BeaconBlockRoot),
+				Source: &types.Checkpoint{
+					Epoch: uint64(attestation.Data.Source.Epoch),
+					Root:  utils.MustParseHex(attestation.Data.Source.Root),
+				},
+				Target: &types.Checkpoint{
+					Epoch: uint64(attestation.Data.Target.Epoch),
+					Root:  utils.MustParseHex(attestation.Data.Target.Root),
+				},
+			},
+			Signature: utils.MustParseHex(attestation.Signature),
+		}
+
+		aggregationBits := bitfield.Bitlist(a.AggregationBits)
+		assignments, err := lc.GetEpochAssignments(a.Data.Slot / utils.Config.Chain.Config.SlotsPerEpoch)
+		if err != nil {
+			return nil, fmt.Errorf("error receiving epoch assignment for epoch %v: %v", a.Data.Slot/utils.Config.Chain.Config.SlotsPerEpoch, err)
+		}
+
+		for i := uint64(0); i < aggregationBits.Len(); i++ {
+			if aggregationBits.BitAt(i) {
+				validator, found := assignments.AttestorAssignments[utils.FormatAttestorAssignmentKey(a.Data.Slot, a.Data.CommitteeIndex, i)]
+				if !found { // This should never happen!
+					validator = 0
+					logger.Errorf("error retrieving assigned validator for attestation %v of block %v for slot %v committee index %v member index %v", i, block.Slot, a.Data.Slot, a.Data.CommitteeIndex, i)
+				}
+				a.Attesters = append(a.Attesters, validator)
+			}
+		}
+
+		block.Attestations[i] = a
+	}
 	*/
 
 	for i, deposit := range parsedBlock.Message.Body.Deposits {
