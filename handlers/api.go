@@ -810,7 +810,6 @@ func ApiValidatorsStatusSummary(w http.ResponseWriter, r *http.Request) {
 	validatorsPageData.ExitedCount = validatorsPageData.VoluntaryExitsCount + validatorsPageData.Slashed
 	validatorsPageData.TotalCount = validatorsPageData.ActiveCount + validatorsPageData.ExitingCount + validatorsPageData.ExitedCount + validatorsPageData.PendingCount + validatorsPageData.DepositedCount
 
-
 	sendOKResponse(j, r.URL.String(), []interface{}{validatorsPageData})
 }
 
@@ -3637,6 +3636,24 @@ func parseApiValidatorParamToIndices(origParam string, limit int) (indices []uin
 	}
 
 	return queryIndicesDeduped, nil
+}
+
+// ApiStakingStats godoc
+// @Summary Get the eth2 staking stats
+// @Tags Staking
+// @Description Returns the stats of the staking
+// @Produce  json
+// @Success 200 {object} types.ApiResponse{data=types.Stats}
+// @Failure 400 {object} types.ApiResponse
+// @Router /api/v1/staking/stats [get]
+func ApiStakingStats(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Total ETH amount locked
+
+	j := json.NewEncoder(w)
+	stats := services.GetLatestStats()
+	sendOKResponse(j, r.URL.String(), []interface{}{stats})
 }
 
 func parseApiValidatorParamToPubkeys(origParam string, limit int) (pubkeys pq.ByteaArray, err error) {
