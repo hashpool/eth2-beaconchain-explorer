@@ -368,6 +368,7 @@ func doFullCheck(client rpc.Client, lookback uint64) {
 		return
 	}
 
+	/*
 	// Add not yet exported epochs to the export set (for example during the initial sync)
 	if len(epochs) > 0 && epochs[len(epochs)-1] < head.HeadEpoch {
 		for i := epochs[len(epochs)-1]; i <= head.HeadEpoch; i++ {
@@ -392,6 +393,34 @@ func doFullCheck(client rpc.Client, lookback uint64) {
 				logger.Printf("queuing epoch %v for export", j)
 				epochsToExport[j] = true
 			}
+		}
+	}
+	*/
+
+	// check latest XX missing epochs and export
+	exportEpochsLookback := head.HeadEpoch - utils.Config.Indexer.FullCheckExportEpochsLookback
+	if exportEpochsLookback < 0 {
+		exportEpochsLookback = 0
+	}
+	logger.Infof("epoch gap found between epochs %v and %v", exportEpochsLookback, head.HeadEpoch)
+	startCheck := 0
+	if len(epochs) > int(utils.Config.Indexer.FullCheckExportEpochsLookback) {
+		startCheck = len(epochs) - int(utils.Config.Indexer.FullCheckExportEpochsLookback)
+	}
+	for i := exportEpochsLookback; i <= head.HeadEpoch; i++ {
+		if _, ok := epochsToExport[i]; ok {
+			continue
+		}
+		inList := false
+		for j := startCheck; j < len(epochs)-1; i++ {
+			if i == epochs[j] {
+				inList = true
+				break
+			}
+		}
+		if !inList {
+			logger.Printf("queuing epoch %v for export--", i)
+			epochsToExport[i] = true
 		}
 	}
 

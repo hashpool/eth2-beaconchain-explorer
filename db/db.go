@@ -926,7 +926,7 @@ func saveValidators(data *types.EpochData, tx *sqlx.Tx, client rpc.Client) error
 		metrics.TaskDuration.WithLabelValues("db_save_validators").Observe(time.Since(start).Seconds())
 	}()
 
-	var genesisBalances map[uint64][]*types.ValidatorBalance = make(map[uint64][]*types.ValidatorBalance, 1)
+	var genesisBalances map[uint64][]*types.ValidatorBalance = make(map[uint64][]*types.ValidatorBalance)
 
 	if data.Epoch == 0 && BigtableClient != nil{
 		var err error
@@ -1045,8 +1045,8 @@ func saveValidators(data *types.EpochData, tx *sqlx.Tx, client rpc.Client) error
 				v.PublicKey,
 				v.WithdrawableEpoch,
 				v.WithdrawalCredentials,
-				0,
-				0,
+				v.Balance,
+				v.EffectiveBalance,
 				v.Slashed,
 				v.ActivationEligibilityEpoch,
 				v.ActivationEpoch,
@@ -1107,28 +1107,28 @@ func saveValidators(data *types.EpochData, tx *sqlx.Tx, client rpc.Client) error
 				v.Status = "active_online"
 			}
 
-			// if c.LastAttestationSlot != v.LastAttestationSlot && v.LastAttestationSlot.Valid {
-			// 	// logger.Infof("LastAttestationSlot changed for validator %v from %v to %v", v.Index, c.LastAttestationSlot.Int64, v.LastAttestationSlot.Int64)
+			if c.LastAttestationSlot != v.LastAttestationSlot && v.LastAttestationSlot.Valid {
+				// logger.Infof("LastAttestationSlot changed for validator %v from %v to %v", v.Index, c.LastAttestationSlot.Int64, v.LastAttestationSlot.Int64)
 
-			// 	queries.WriteString(fmt.Sprintf("UPDATE validators SET lastattestationslot = %d WHERE validatorindex = %d;\n", v.LastAttestationSlot.Int64, c.Index))
-			// 	updates++
-			// }
+				queries.WriteString(fmt.Sprintf("UPDATE validators SET lastattestationslot = %d WHERE validatorindex = %d;\n", v.LastAttestationSlot.Int64, c.Index))
+				updates++
+			}
 
 			if c.Status != v.Status {
 				logger.Infof("Status changed for validator %v from %v to %v", v.Index, c.Status, v.Status)
 				queries.WriteString(fmt.Sprintf("UPDATE validators SET status = '%s' WHERE validatorindex = %d;\n", v.Status, c.Index))
 				updates++
 			}
-			// if c.Balance != v.Balance {
-			// 	// logger.Infof("Balance changed for validator %v from %v to %v", v.Index, c.Balance, v.Balance)
-			// 	queries.WriteString(fmt.Sprintf("UPDATE validators SET balance = %d WHERE validatorindex = %d;\n", v.Balance, c.Index))
-			// 	updates++
-			// }
-			// if c.EffectiveBalance != v.EffectiveBalance {
-			// 	// logger.Infof("EffectiveBalance changed for validator %v from %v to %v", v.Index, c.EffectiveBalance, v.EffectiveBalance)
-			// 	queries.WriteString(fmt.Sprintf("UPDATE validators SET effectivebalance = %d WHERE validatorindex = %d;\n", v.EffectiveBalance, c.Index))
-			// 	updates++
-			// }
+			if c.Balance != v.Balance {
+				// logger.Infof("Balance changed for validator %v from %v to %v", v.Index, c.Balance, v.Balance)
+				queries.WriteString(fmt.Sprintf("UPDATE validators SET balance = %d WHERE validatorindex = %d;\n", v.Balance, c.Index))
+				updates++
+			}
+			if c.EffectiveBalance != v.EffectiveBalance {
+				// logger.Infof("EffectiveBalance changed for validator %v from %v to %v", v.Index, c.EffectiveBalance, v.EffectiveBalance)
+				queries.WriteString(fmt.Sprintf("UPDATE validators SET effectivebalance = %d WHERE validatorindex = %d;\n", v.EffectiveBalance, c.Index))
+				updates++
+			}
 			if c.Slashed != v.Slashed {
 				logger.Infof("Slashed changed for validator %v from %v to %v", v.Index, c.Slashed, v.Slashed)
 				queries.WriteString(fmt.Sprintf("UPDATE validators SET slashed = %v WHERE validatorindex = %d;\n", v.Slashed, c.Index))
