@@ -412,7 +412,7 @@ func doFullCheck(client rpc.Client, lookback uint64) {
 			continue
 		}
 		inList := false
-		for j := startCheck; j < len(epochs)-1; i++ {
+		for j := startCheck; j < len(epochs)-1; j++ {
 			if i == epochs[j] {
 				inList = true
 				break
@@ -533,7 +533,7 @@ func ExportEpoch(epoch uint64, client rpc.Client) error {
 	startGetEpochData := time.Now()
 	logger.Printf("retrieving data for epoch %v", epoch)
 
-	data, err := client.GetEpochData(epoch, false)
+	data, err := client.GetEpochData(epoch, true)
 	if err != nil {
 		return fmt.Errorf("error retrieving epoch data: %v", err)
 	}

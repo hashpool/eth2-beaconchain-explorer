@@ -49,7 +49,7 @@ indexer:
   enabled: true # Enable or disable the indexing service
   fullIndexOnStartup: false # Perform a one time full db index on startup
   indexMissingEpochsOnStartup: false # Check for missing epochs and export them after startup
-  fullCheckExportEpochsLookback: 50 # Check for latest XX missing epochs and export them when full check
+  fullCheckExportEpochsLookback: 100 # Check for latest XX missing epochs and export them when full check
   node:
     host: "192.168.66.130" # Address of the backend node
     port: "5052" # GRPC port of the Prysm node
