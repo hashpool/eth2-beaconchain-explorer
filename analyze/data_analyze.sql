@@ -34,8 +34,7 @@ select distinct validatorindex, encode(ed.publickey, 'hex')
 from eth1_deposits as ed
          left join validators as v on encode(ed.publickey, 'hex') = v.pubkeyhex
 where (v.pubkeyhex is null and ed.valid_signature is true) -- 在validator中不存在
-   or (v.pubkeyhex is not null and v.activationepoch > (select max(epoch) from epochs))
---在validator中存在但还未激活
+   or (v.pubkeyhex is not null and v.activationepoch > (select max(epoch) from epochs)) --在validator中存在但还未激活
 
 
 -- 4）已经申请退出等待Withdraw提款的所有validator的数量和金额（自愿和强制的都有，并且款未到账）
@@ -47,8 +46,7 @@ and (
 	or
 	((select max(epoch) from epochs) >= exitepoch and (select max(epoch) from epochs) <  withdrawableepoch ) --到达exitepoch，但还没拿到钱
 	or
-	((select max(epoch) from epochs) > withdrawableepoch and substring(encode(withdrawalcredentials,  'hex'),1,2) = '00' ))
--- 应该可以拿到钱了，但是没配置提现地址
+	((select max(epoch) from epochs) > withdrawableepoch and substring(encode(withdrawalcredentials,  'hex'),1,2) = '00' )) -- 应该可以拿到钱了，但是没配置提现地址
 
 -- 4.1）自愿退出等待Withdraw提款（款未到账）
 select v.validatorindex, substring(encode(withdrawalcredentials, 'hex'), 1, 2), v.exitepoch, v.withdrawableepoch
@@ -60,8 +58,7 @@ and (
 	or
 	((select max(epoch) from epochs) >= exitepoch and (select max(epoch) from epochs) <  withdrawableepoch ) --到达exitepoch，但还没拿到钱
 	or
-	((select max(epoch) from epochs) > withdrawableepoch and substring(encode(withdrawalcredentials,  'hex'),1,2) = '00' ))
--- 应该可以拿到钱了，但是没配置提现地址
+	((select max(epoch) from epochs) > withdrawableepoch and substring(encode(withdrawalcredentials,  'hex'),1,2) = '00' )) -- 应该可以拿到钱了，但是没配置提现地址
 
 
 -- 5）BLSChange 的 validators 数量和占比(正在验证中并配置了提现地址)
@@ -77,8 +74,7 @@ from eth1_deposits as ed
          left join validators as v on encode(ed.publickey, 'hex') = v.pubkeyhex
 where (v.pubkeyhex is null and ed.valid_signature is true and block_numer > $昨日最大区块号) -- 在validator中不存在
    or (v.pubkeyhex is not null and v.activationepoch > (select max(epoch) from epochs) and
-       validatorindex > $昨日最大validatorindex)
---在validator中存在但还未激活
+       validatorindex > $昨日最大validatorindex) --在validator中存在但还未激活
 
 
 -- 7）每日Withdraw的数量（根据slot可以计算出时间，从而可以查询每日体现数量）
