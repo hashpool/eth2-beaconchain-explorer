@@ -38,7 +38,7 @@ where (v.pubkeyhex is null and ed.valid_signature is true) -- 在validator中不
 --在validator中存在但还未激活
 
 
--- 4）已经申请退出等待Withdraw提款的所有validator的数量和金额（自愿和强制的都有）
+-- 4）已经申请退出等待Withdraw提款的所有validator的数量和金额（自愿和强制的都有，并且款未到账）
 select count(*), sum(balance)
 from validators
 where exitepoch != 9223372036854775807
@@ -50,7 +50,18 @@ and (
 	((select max(epoch) from epochs) > withdrawableepoch and substring(encode(withdrawalcredentials,  'hex'),1,2) = '00' ))
 -- 应该可以拿到钱了，但是没配置提现地址
 
--- 4.1）自愿退出，没有数据，看不出来
+-- 4.1）自愿退出等待Withdraw提款（款未到账）
+select v.validatorindex, substring(encode(withdrawalcredentials, 'hex'), 1, 2), v.exitepoch, v.withdrawableepoch
+from blocks_voluntaryexits as bv
+         join validators as v on bv.validatorindex = v.validatorindex
+where exitepoch != 9223372036854775807
+and (
+	(select max(epoch) from epochs) < exitepoch  --已申请，还未到 exitepoch
+	or
+	((select max(epoch) from epochs) >= exitepoch and (select max(epoch) from epochs) <  withdrawableepoch ) --到达exitepoch，但还没拿到钱
+	or
+	((select max(epoch) from epochs) > withdrawableepoch and substring(encode(withdrawalcredentials,  'hex'),1,2) = '00' ))
+-- 应该可以拿到钱了，但是没配置提现地址
 
 
 -- 5）BLSChange 的 validators 数量和占比(正在验证中并配置了提现地址)
@@ -60,7 +71,7 @@ from validators
 where activationepoch <= (select max(epoch) from epochs)
   and (select max(epoch) from epochs) < exitepoch
 
--- 6）每日抵押的以太坊数量()
+-- 6）每日抵押的以太坊数量(或者是否可以查询block_deposits表来完成)
 select sum(ed.amount) / 1e9
 from eth1_deposits as ed
          left join validators as v on encode(ed.publickey, 'hex') = v.pubkeyhex
@@ -78,6 +89,3 @@ where validatorindex in (select validatorindex
                          where substring(encode(withdrawalcredentials, 'hex'), 1, 2) != '00'
     )
 group by block_slot
-
-
-
