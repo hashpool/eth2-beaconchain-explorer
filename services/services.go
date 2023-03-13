@@ -1599,3 +1599,54 @@ func getBurnPageData() (*types.BurnPageData, error) {
 	logger.Infof("epoch burn page export took: %v seconds", time.Since(start).Seconds())
 	return data, nil
 }
+
+func GetLastEpoch() (epoch types.EpochsData, err error) {
+	err = db.ReaderDb.Select(&epoch, "select epoch, blockscount, proposerslashingscount, attesterslashingscount, attestationscount, depositscount,"+
+		"withdrawalcount, voluntaryexitscount, validatorscount, averagevalidatorbalance, totalvalidatorbalance, finalized, eligibleether, globalparticipationrate,"+
+		"votedether  from epochs order by epoch desc limit 1")
+
+	return epoch, err
+}
+
+func GetWaitingActivationAmountLocked(epoch uint64) (activationLocked uint64, err error) {
+	err = db.ReaderDb.Select(&activationLocked,
+		"select sum(ed.amount) from eth1_deposits as ed "+
+			" left join validators as v on  encode(ed.publickey, 'hex') = v.pubkeyhex"+
+			" where (v.pubkeyhex is null and ed.valid_signature is true) "+
+			" or (v.pubkeyhex is not null and v.activationepoch > $1)", epoch)
+
+	return activationLocked, err
+}
+
+func GetExitedWaitingWithdrawAmountLocked(epoch uint64) (waitingWithdrawalLocked uint64, err error) {
+	err = db.ReaderDb.Select(&waitingWithdrawalLocked,
+		"select sum(balance) from validators "+
+			" where pubkeyhex is not null and exitepoch <= $1 and $1 < withdrawableepoch", epoch)
+
+	return waitingWithdrawalLocked, err
+}
+
+func GetWithdrawableNotFoundAddressAmountLocked(epoch uint64) (withdrawableNotFoundAddressLocked uint64, err error) {
+	err = db.ReaderDb.Select(&withdrawableNotFoundAddressLocked,
+		"select sum(balance) from validators "+
+			" where pubkeyhex is not null and exitepoch <= $1 and $1 >= withdrawableepoch "+
+			" and substring(encode(withdrawalcredentials,  'hex'),1,2) = '00'", epoch)
+
+	return withdrawableNotFoundAddressLocked, err
+}
+
+func GetTotalWaitingActivationValidators(epoch uint64) (waitingActivationCount uint64, err error) {
+	err = db.ReaderDb.Select(&waitingActivationCount,
+		" select count(distinct ed.publickey) from eth1_deposits as ed "+
+			" left join validators as v on  encode(ed.publickey, 'hex') = v.pubkeyhex "+
+			" where "+
+			" (v.pubkeyhex is null and ed.valid_signature is true) "+
+			" or "+
+			" (v.pubkeyhex is not null and v.activationepoch > $1)", epoch)
+
+	return waitingActivationCount, err
+}
+
+func GetEstimateStakingWaitTime(epoch uint64) (estimateStakingWaitTime uint64) {
+	return estimateStakingWaitTime
+}

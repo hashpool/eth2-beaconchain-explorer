@@ -686,3 +686,13 @@ type ApiValidatorProposalsResponse struct {
 	SyncaggregateSignature     string  `db:"syncaggregate_signature" json:"syncaggregate_signature"`
 	Voluntaryexitscount        uint64  `db:"voluntaryexitscount" json:"voluntaryexitscount"`
 }
+
+// convert this json object to a golang struct called ApiStakingStatisticResponse
+type ApiStakingStatisticResponse struct {
+	Epoch                  uint64  `json:"epoch,omitempty"`
+	TotalAmountLocked      uint64  `json:"total_amount_locked"`
+	TotalActiveValidators  uint64  `json:"total_active_validators"`
+	TotalWaitingValidators uint64  `json:"total_waiting_validators"`
+	StakingWaitTime        uint64  `json:"staking_wait_time"`
+	StakingRate            float64 `json:"staking_rate"`
+}

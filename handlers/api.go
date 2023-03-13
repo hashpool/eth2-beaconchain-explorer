@@ -3638,24 +3638,6 @@ func parseApiValidatorParamToIndices(origParam string, limit int) (indices []uin
 	return queryIndicesDeduped, nil
 }
 
-// ApiStakingStats godoc
-// @Summary Get the eth2 staking stats
-// @Tags Staking
-// @Description Returns the stats of the staking
-// @Produce  json
-// @Success 200 {object} types.ApiResponse{data=types.Stats}
-// @Failure 400 {object} types.ApiResponse
-// @Router /api/v1/staking/stats [get]
-func ApiStakingStats(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	// Total ETH amount locked
-
-	j := json.NewEncoder(w)
-	stats := services.GetLatestStats()
-	sendOKResponse(j, r.URL.String(), []interface{}{stats})
-}
-
 func parseApiValidatorParamToPubkeys(origParam string, limit int) (pubkeys pq.ByteaArray, err error) {
 	var indices pq.Int64Array
 	params := strings.Split(origParam, ",")
@@ -3704,4 +3686,89 @@ func parseApiValidatorParamToPubkeys(origParam string, limit int) (pubkeys pq.By
 	}
 
 	return queryIndicesDeduped, nil
+}
+
+// ApiStakingStats godoc
+// @Summary Get the eth2 staking stats
+// @Tags Staking
+// @Description Returns the stats of the staking
+// @Produce  json
+// @Success 200 {object} types.ApiResponse{data=types.Stats}
+// @Failure 400 {object} types.ApiResponse
+// @Router /api/v1/staking/stats [get]
+func ApiStakingStats(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	j := json.NewEncoder(w)
+	var apiResponse types.ApiResponse
+	apiResponse.Status = "1"
+	statisticResp := &types.ApiStakingStatisticResponse{
+		Epoch:                  0,
+		TotalAmountLocked:      0,
+		TotalActiveValidators:  0,
+		TotalWaitingValidators: 0,
+		StakingWaitTime:        0,
+		StakingRate:            float64(0),
+	}
+	lastEpoch, err := services.GetLastEpoch()
+	if err != nil {
+		logger.Errorf("An error occurred when get lastest epoch data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	if &lastEpoch == nil {
+		logger.Debugf("not found lastest epoch.")
+		apiResponse.Data = statisticResp
+		sendOKResponse(j, r.URL.String(), []interface{}{apiResponse})
+		return
+	}
+
+	// 获取所有活跃的Validators的锁仓以太坊数量（Status: activation）
+	totalAmountLocked := lastEpoch.TotalValidatorBalance
+
+	// 获取所有等待激活的Validators的锁仓以太坊数量 (Status: deposited and pending）
+	waitingActivationAmountLocked, err := services.GetWaitingActivationAmountLocked(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when waiting activation amount locked data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	totalAmountLocked = totalAmountLocked + waitingActivationAmountLocked
+
+	// 获取所有已经退出但正在等待提现的锁仓以太坊数量 (Status: exited and waiting withdrawal）
+	exitedWaitingWithdrawAmountLocked, err := services.GetExitedWaitingWithdrawAmountLocked(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when waiting withdrawal amount locked data after exited. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+	totalAmountLocked = totalAmountLocked + exitedWaitingWithdrawAmountLocked
+
+	// 获取所有已经可以提现但未配置提现地址的锁仓以太坊数量 (Status: withdrawable but not found withdrawal address）
+	withdrawableNotFoundAddressAmountLocked, err := services.GetWithdrawableNotFoundAddressAmountLocked(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when withdrawable but not found address amount locked data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+	totalAmountLocked = totalAmountLocked + withdrawableNotFoundAddressAmountLocked
+
+	// 获取所有等待激活的验证者数量
+	totalWaitingValidators, err := services.GetTotalWaitingActivationValidators(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get waiting (deposited and pending) activation validator count. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	estimateStakingWaitTime := services.GetEstimateStakingWaitTime(lastEpoch.Epoch)
+
+	statisticResp.TotalAmountLocked = totalAmountLocked
+	statisticResp.TotalActiveValidators = lastEpoch.ValidatorsCount
+	statisticResp.TotalWaitingValidators = totalWaitingValidators
+	statisticResp.StakingWaitTime = estimateStakingWaitTime
+	statisticResp.StakingRate = lastEpoch.GlobalParticipationRate
+
+	sendOKResponse(j, r.URL.String(), []interface{}{apiResponse})
 }
