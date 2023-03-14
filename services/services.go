@@ -1675,3 +1675,48 @@ func GetPendingCount(epoch uint64) (count uint64, err error) {
 func GetEstimateStakingWaitTime(epoch uint64) (estimateStakingWaitTime uint64) {
 	return estimateStakingWaitTime
 }
+
+func GetWithdrawnAmount() (amount uint64, err error) {
+	err = db.ReaderDb.Get(&amount, " select sum(amount) from blocks_withdrawals ")
+
+	return amount, err
+}
+
+func GetActivationWaitingWithdrawalAmount(epoch uint64) (amount uint64, err error) {
+	err = db.ReaderDb.Get(&amount, " select sum(balance - 32 * 1e9) from validators "+
+		"where substring(encode(withdrawalcredentials,  'hex'),1,2) != '00' "+
+		" and activationepoch <= $1 and $1 < exitepoch "+
+		" and balance > 32 * 1e9 ", epoch)
+
+	return amount, err
+}
+
+func GetExitedWaitingWithdrawalAmount(epoch uint64) (amount uint64, err error) {
+	err = db.ReaderDb.Get(&amount, " select sum(balance) from validators "+
+		"where substring(encode(withdrawalcredentials,  'hex'),1,2) != '00' "+
+		" and exitepoch <= $1 and $1 < withdrawableepoch ", epoch)
+
+	return amount, err
+}
+
+func GetUnAddressWaitingWithdrawalAmount(epoch uint64) (amount uint64, err error) {
+	err = db.ReaderDb.Get(&amount, " select sum(balance) from validators "+
+		"where substring(encode(withdrawalcredentials,  'hex'),1,2) = '00' "+
+		" and $1 >= withdrawableepoch ", epoch)
+
+	return amount, err
+}
+
+func GetBLSData(epoch uint64) (data types.BLSData, err error) {
+	err = db.ReaderDb.Get(&data,
+		" select sum(case when substring(encode(withdrawalcredentials,  'hex'),1,2) != '00' then 1 else 0 end) as blsvalidatorcount, "+
+			" round(sum(case when substring(encode(withdrawalcredentials,  'hex'),1,2) != '00' then 1 else 0 end) * 1.0 / count(*), 4) as blsvalidatorrate "+
+			" from validators "+
+			" where activationepoch <= $1 ", epoch)
+
+	return data, err
+}
+
+func GetEstimateWithdrawalWaitTime(epoch uint64) (estimateWithdrawalWaitTime uint64) {
+	return estimateWithdrawalWaitTime
+}

@@ -687,6 +687,7 @@ type ApiValidatorProposalsResponse struct {
 	Voluntaryexitscount        uint64  `db:"voluntaryexitscount" json:"voluntaryexitscount"`
 }
 
+// convert this json object to a golang struct called ApiValidatorStatusSummaryResponse
 type ApiValidatorStatusSummaryResponse struct {
 	Epoch               uint64 `json:"epoch,omitempty"`
 	PendingDepositCount uint64 `json:"pending_deposit_count"`
@@ -703,4 +704,14 @@ type ApiStakingStatisticResponse struct {
 	TotalWaitingValidators uint64  `json:"total_waiting_validators"`
 	StakingWaitTime        uint64  `json:"staking_wait_time"`
 	StakingRate            float64 `json:"staking_rate"`
+}
+
+// convert this json object to a golang struct called ApiWithdrawalStatisticResponse
+type ApiWithdrawalStatisticResponse struct {
+	Epoch                   uint64  `json:"epoch,omitempty"`
+	WithdrawnAmount         uint64  `json:"withdrawn_amount"`
+	WaitingWithdrawalAmount uint64  `json:"waiting_withdrawal_amount"`
+	BLSValidatorCount       uint64  `json:"blsvalidator_count"`
+	BLSValidatorRate        float64 `json:"blsvalidator_rate"`
+	WithdrawalWaitTime      uint64  `json:"withdrawal_wait_time"`
 }

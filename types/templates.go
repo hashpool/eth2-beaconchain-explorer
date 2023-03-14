@@ -1920,3 +1920,8 @@ type EpochsData struct {
 	GlobalParticipationRate float64 `db:"globalparticipationrate"`
 	VotedEther              uint64  `db:"votedether"`
 }
+
+type BLSData struct {
+	BLSValidatorCount uint64  `db:"blsvalidatorcount"`
+	BLSValidatorRate  float64 `db:"blsvalidatorrate"`
+}

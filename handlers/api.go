@@ -3770,3 +3770,94 @@ func ApiStakingStats(w http.ResponseWriter, r *http.Request) {
 
 	sendOKResponse(j, r.URL.String(), []interface{}{statisticResp})
 }
+
+// ApiWithdrawalStats godoc
+// @Summary Get the eth2 withdrawal stats
+// @Tags Withdrawal
+// @Description Returns the stats of the withdrawal
+// @Produce  json
+// @Success 200 {object} types.ApiResponse{data=types.Stats}
+// @Failure 400 {object} types.ApiResponse
+// @Router /api/v1/withdrawal/stats [get]
+func ApiWithdrawalStats(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	j := json.NewEncoder(w)
+	statisticResp := &types.ApiWithdrawalStatisticResponse{
+		Epoch:                   0,
+		WithdrawnAmount:         0,
+		WaitingWithdrawalAmount: 0,
+		BLSValidatorCount:       0,
+		BLSValidatorRate:        float64(0),
+		WithdrawalWaitTime:      0,
+	}
+	lastEpochs, err := services.GetLastEpoch()
+	if err != nil {
+		logger.Errorf("An error occurred when get lastest epoch data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	if len(lastEpochs) == 0 {
+		logger.Debugf("not found lastest epoch.")
+		sendOKResponse(j, r.URL.String(), []interface{}{statisticResp})
+		return
+	}
+
+	lastEpoch := lastEpochs[0]
+
+	// 获取所有已提现的ETH数量
+	withdrawalAmount, err := services.GetWithdrawnAmount()
+	if err != nil {
+		logger.Errorf("An error occurred when get withdrawal amount data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	statisticResp.WithdrawnAmount = withdrawalAmount
+
+	// 获取所有正在验证的验证者等待提现的ETH数量
+	activationWaitingWithdrawalAmount, err := services.GetActivationWaitingWithdrawalAmount(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get activation waiting withdrawal amount data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	waitingWithdrawalAmount := activationWaitingWithdrawalAmount
+
+	// 获取所有已经退出的验证者等待提现的ETH数量
+	exitedWaitingWithdrawalAmount, err := services.GetExitedWaitingWithdrawalAmount(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get exited waiting withdrawal amount data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	waitingWithdrawalAmount = waitingWithdrawalAmount + exitedWaitingWithdrawalAmount
+
+	// 获取所有已退出可提现但未配置提现地址等待提现的ETH数量
+	unAddressWaitingWithdrawalAmount, err := services.GetUnAddressWaitingWithdrawalAmount(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get not config withdrawal address amount data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	waitingWithdrawalAmount = waitingWithdrawalAmount + unAddressWaitingWithdrawalAmount
+
+	statisticResp.WaitingWithdrawalAmount = waitingWithdrawalAmount
+
+	blsData, err := services.GetBLSData(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get bls data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	statisticResp.BLSValidatorCount = blsData.BLSValidatorCount
+	statisticResp.BLSValidatorRate = blsData.BLSValidatorRate
+
+	statisticResp.WithdrawalWaitTime = services.GetEstimateWithdrawalWaitTime(lastEpoch.Epoch)
+
+	sendOKResponse(j, r.URL.String(), []interface{}{statisticResp})
+}

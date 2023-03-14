@@ -303,6 +303,9 @@ func main() {
 		// Staking
 		apiV1Router.HandleFunc("/staking/stats", handlers.ApiStakingStats).Methods("GET", "OPTIONS")
 
+		// Withdrawal
+		apiV1Router.HandleFunc("/withdrawal/stats", handlers.ApiWithdrawalStats).Methods("GET", "OPTIONS")
+
 		apiV1Router.HandleFunc("/staking/stats", handlers.ApiValidatorsStats).Methods("GET", "OPTIONS")
 		apiV1Router.HandleFunc("/graffitiwall", handlers.ApiGraffitiwall).Methods("GET", "OPTIONS")
 		apiV1Router.HandleFunc("/chart/{chart}", handlers.ApiChart).Methods("GET", "OPTIONS")
