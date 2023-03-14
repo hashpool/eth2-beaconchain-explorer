@@ -753,64 +753,63 @@ func ApiValidatorQueue(w http.ResponseWriter, r *http.Request) {
 // @Router /api/v1/validators/statussummary [get]
 func ApiValidatorsStatusSummary(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
-	// TODO(Leo): 需要走redis缓存, 或者参考 getRocketpoolStats()
 	j := json.NewEncoder(w)
-	validatorsPageData := types.ValidatorsPageData{}
-	validatorsPageData.PendingCount = 0
-	validatorsPageData.ActiveOnlineCount = 0
-	validatorsPageData.ActiveOfflineCount = 0
-	validatorsPageData.ActiveCount = 0
-	validatorsPageData.SlashingOnlineCount = 0
-	validatorsPageData.SlashingOfflineCount = 0
-	validatorsPageData.SlashingCount = 0
-	validatorsPageData.ExitingOnlineCount = 0
-	validatorsPageData.ExitingOfflineCount = 0
-	validatorsPageData.ExitedCount = 0
-	validatorsPageData.VoluntaryExitsCount = 0
-	validatorsPageData.DepositedCount = 0
-
-	var currentStateCounts []*states
-
-	qry := "SELECT status AS statename, COUNT(*) AS statecount FROM validators GROUP BY status"
-	err := db.ReaderDb.Select(&currentStateCounts, qry)
+	summaryResp := &types.ApiValidatorStatusSummaryResponse{
+		Epoch:               0,
+		PendingDepositCount: 0,
+		DepositedCount:      0,
+		PendingCount:        0,
+		ActivationCount:     0,
+	}
+	lastEpochs, err := services.GetLastEpoch()
 	if err != nil {
-		sendErrorResponse(w, r.URL.String(), "could not get validators status summary")
+		logger.Errorf("An error occurred when get lastest epoch data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
 		return
 	}
 
-	for _, state := range currentStateCounts {
-		switch state.Name {
-		case "pending":
-			validatorsPageData.PendingCount = state.Count
-		case "active_online":
-			validatorsPageData.ActiveOnlineCount = state.Count
-		case "active_offline":
-			validatorsPageData.ActiveOfflineCount = state.Count
-		case "slashing_online":
-			validatorsPageData.SlashingOnlineCount = state.Count
-		case "slashing_offline":
-			validatorsPageData.SlashingOfflineCount = state.Count
-		case "slashed":
-			validatorsPageData.Slashed = state.Count
-		case "exiting_online":
-			validatorsPageData.ExitingOnlineCount = state.Count
-		case "exiting_offline":
-			validatorsPageData.ExitingOfflineCount = state.Count
-		case "exited":
-			validatorsPageData.VoluntaryExitsCount = state.Count
-		case "deposited":
-			validatorsPageData.DepositedCount = state.Count
-		}
+	if len(lastEpochs) == 0 {
+		logger.Debugf("not found lastest epoch.")
+		sendOKResponse(j, r.URL.String(), []interface{}{summaryResp})
+		return
 	}
 
-	validatorsPageData.ActiveCount = validatorsPageData.ActiveOnlineCount + validatorsPageData.ActiveOfflineCount
-	validatorsPageData.SlashingCount = validatorsPageData.SlashingOnlineCount + validatorsPageData.SlashingOfflineCount
-	validatorsPageData.ExitingCount = validatorsPageData.ExitingOnlineCount + validatorsPageData.ExitingOfflineCount
-	validatorsPageData.ExitedCount = validatorsPageData.VoluntaryExitsCount + validatorsPageData.Slashed
-	validatorsPageData.TotalCount = validatorsPageData.ActiveCount + validatorsPageData.ExitingCount + validatorsPageData.ExitedCount + validatorsPageData.PendingCount + validatorsPageData.DepositedCount
+	lastEpoch := lastEpochs[0]
 
-	sendOKResponse(j, r.URL.String(), []interface{}{validatorsPageData})
+	// 获取所有活跃的Validators数量
+	summaryResp.ActivationCount = lastEpoch.ValidatorsCount
+
+	// 获取所有的PendingDeposit的数量
+	pendingDeposit, err := services.GetPendingDepositCount()
+	if err != nil {
+		logger.Errorf("An error occurred when get pending deposit data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	summaryResp.PendingDepositCount = pendingDeposit
+
+	// 获取所有的Deposited的数量
+	deposited, err := services.GetDepositedCount(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get deposited data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	summaryResp.DepositedCount = deposited
+
+	// 获取所有的Pending的数量
+	pending, err := services.GetPendingCount(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get pending data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	summaryResp.PendingCount = pending
+
+	sendOKResponse(j, r.URL.String(), []interface{}{summaryResp})
 }
 
 // ApiValidatorsStats godoc
@@ -3699,8 +3698,6 @@ func parseApiValidatorParamToPubkeys(origParam string, limit int) (pubkeys pq.By
 func ApiStakingStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	j := json.NewEncoder(w)
-	var apiResponse types.ApiResponse
-	apiResponse.Status = "1"
 	statisticResp := &types.ApiStakingStatisticResponse{
 		Epoch:                  0,
 		TotalAmountLocked:      0,
@@ -3709,19 +3706,20 @@ func ApiStakingStats(w http.ResponseWriter, r *http.Request) {
 		StakingWaitTime:        0,
 		StakingRate:            float64(0),
 	}
-	lastEpoch, err := services.GetLastEpoch()
+	lastEpochs, err := services.GetLastEpoch()
 	if err != nil {
 		logger.Errorf("An error occurred when get lastest epoch data. err: %v", err)
 		sendServerErrorResponse(w, r.URL.String(), "Data exception")
 		return
 	}
 
-	if &lastEpoch == nil {
+	if len(lastEpochs) == 0 {
 		logger.Debugf("not found lastest epoch.")
-		apiResponse.Data = statisticResp
-		sendOKResponse(j, r.URL.String(), []interface{}{apiResponse})
+		sendOKResponse(j, r.URL.String(), []interface{}{statisticResp})
 		return
 	}
+
+	lastEpoch := lastEpochs[0]
 
 	// 获取所有活跃的Validators的锁仓以太坊数量（Status: activation）
 	totalAmountLocked := lastEpoch.TotalValidatorBalance
@@ -3770,5 +3768,5 @@ func ApiStakingStats(w http.ResponseWriter, r *http.Request) {
 	statisticResp.StakingWaitTime = estimateStakingWaitTime
 	statisticResp.StakingRate = lastEpoch.GlobalParticipationRate
 
-	sendOKResponse(j, r.URL.String(), []interface{}{apiResponse})
+	sendOKResponse(j, r.URL.String(), []interface{}{statisticResp})
 }

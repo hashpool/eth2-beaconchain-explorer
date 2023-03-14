@@ -1600,16 +1600,16 @@ func getBurnPageData() (*types.BurnPageData, error) {
 	return data, nil
 }
 
-func GetLastEpoch() (epoch types.EpochsData, err error) {
-	err = db.ReaderDb.Select(&epoch, "select epoch, blockscount, proposerslashingscount, attesterslashingscount, attestationscount, depositscount,"+
+func GetLastEpoch() (epochs []types.EpochsData, err error) {
+	err = db.ReaderDb.Select(&epochs, "select epoch, blockscount, proposerslashingscount, attesterslashingscount, attestationscount, depositscount,"+
 		"withdrawalcount, voluntaryexitscount, validatorscount, averagevalidatorbalance, totalvalidatorbalance, finalized, eligibleether, globalparticipationrate,"+
 		"votedether  from epochs order by epoch desc limit 1")
 
-	return epoch, err
+	return epochs, err
 }
 
 func GetWaitingActivationAmountLocked(epoch uint64) (activationLocked uint64, err error) {
-	err = db.ReaderDb.Select(&activationLocked,
+	err = db.ReaderDb.Get(&activationLocked,
 		"select sum(ed.amount) from eth1_deposits as ed "+
 			" left join validators as v on  encode(ed.publickey, 'hex') = v.pubkeyhex"+
 			" where (v.pubkeyhex is null and ed.valid_signature is true) "+
@@ -1619,7 +1619,7 @@ func GetWaitingActivationAmountLocked(epoch uint64) (activationLocked uint64, er
 }
 
 func GetExitedWaitingWithdrawAmountLocked(epoch uint64) (waitingWithdrawalLocked uint64, err error) {
-	err = db.ReaderDb.Select(&waitingWithdrawalLocked,
+	err = db.ReaderDb.Get(&waitingWithdrawalLocked,
 		"select sum(balance) from validators "+
 			" where pubkeyhex is not null and exitepoch <= $1 and $1 < withdrawableepoch", epoch)
 
@@ -1627,7 +1627,7 @@ func GetExitedWaitingWithdrawAmountLocked(epoch uint64) (waitingWithdrawalLocked
 }
 
 func GetWithdrawableNotFoundAddressAmountLocked(epoch uint64) (withdrawableNotFoundAddressLocked uint64, err error) {
-	err = db.ReaderDb.Select(&withdrawableNotFoundAddressLocked,
+	err = db.ReaderDb.Get(&withdrawableNotFoundAddressLocked,
 		"select sum(balance) from validators "+
 			" where pubkeyhex is not null and exitepoch <= $1 and $1 >= withdrawableepoch "+
 			" and substring(encode(withdrawalcredentials,  'hex'),1,2) = '00'", epoch)
@@ -1636,7 +1636,7 @@ func GetWithdrawableNotFoundAddressAmountLocked(epoch uint64) (withdrawableNotFo
 }
 
 func GetTotalWaitingActivationValidators(epoch uint64) (waitingActivationCount uint64, err error) {
-	err = db.ReaderDb.Select(&waitingActivationCount,
+	err = db.ReaderDb.Get(&waitingActivationCount,
 		" select count(distinct ed.publickey) from eth1_deposits as ed "+
 			" left join validators as v on  encode(ed.publickey, 'hex') = v.pubkeyhex "+
 			" where "+
@@ -1645,6 +1645,31 @@ func GetTotalWaitingActivationValidators(epoch uint64) (waitingActivationCount u
 			" (v.pubkeyhex is not null and v.activationepoch > $1)", epoch)
 
 	return waitingActivationCount, err
+}
+
+func GetPendingDepositCount() (count uint64, err error) {
+	err = db.ReaderDb.Get(&count,
+		" select count(distinct ed.publickey) from eth1_deposits as ed "+
+			" left join validators as v on  encode(ed.publickey, 'hex') = v.pubkeyhex "+
+			" where v.pubkeyhex is null and ed.valid_signature is true")
+
+	return count, err
+}
+
+func GetDepositedCount(epoch uint64) (count uint64, err error) {
+	err = db.ReaderDb.Get(&count,
+		" select count(v.pubkeyhex) from validators as v "+
+			" where  v.activationeligibilityepoch > $1", epoch)
+
+	return count, err
+}
+
+func GetPendingCount(epoch uint64) (count uint64, err error) {
+	err = db.ReaderDb.Get(&count,
+		" select count(v.pubkeyhex) from validators as v "+
+			" where v.activationepoch > $1 and v.activationeligibilityepoch <= $1", epoch)
+
+	return count, err
 }
 
 func GetEstimateStakingWaitTime(epoch uint64) (estimateStakingWaitTime uint64) {
