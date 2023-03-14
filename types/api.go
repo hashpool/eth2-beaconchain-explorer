@@ -715,3 +715,13 @@ type ApiWithdrawalStatisticResponse struct {
 	BLSValidatorRate        float64 `json:"blsvalidator_rate"`
 	WithdrawalWaitTime      uint64  `json:"withdrawal_wait_time"`
 }
+
+// convert this json object to a golang struct called ApiWithdrawalStatusSummaryResponse
+type ApiWithdrawalStatusSummaryResponse struct {
+	Epoch                   uint64 `json:"epoch,omitempty"`
+	ExitingCount            uint64 `json:"exiting_count"`
+	ExitCount               uint64 `json:"exit_count"`
+	VolExitCount            uint64 `json:"vol_exit_count"`
+	WithdrawalFinishedCount uint64 `json:"withdrawal_finished_count"`
+	withdrawalAmount        uint64 `json:"withdrawal_amount"`
+}
