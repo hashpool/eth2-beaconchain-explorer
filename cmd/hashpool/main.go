@@ -212,6 +212,7 @@ func main() {
 		chainID := new(big.Int).SetUint64(utils.Config.Chain.Config.DepositChainID)
 		if utils.Config.Indexer.Node.Type == "lighthouse" {
 			rpcClient, err = rpc.NewLighthouseClient("http://"+cfg.Indexer.Node.Host+":"+cfg.Indexer.Node.Port, chainID)
+			//rpcClient, err = rpc.NewLighthouseClient("https://eth2-mainnet.paralinker.com/api/v1/c5c07c40db204b38267a0b7a69edd57e", chainID)
 			if err != nil {
 				logrus.Fatal(err)
 			}
