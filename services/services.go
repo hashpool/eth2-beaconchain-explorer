@@ -1736,7 +1736,7 @@ func GetExitedCount(epoch uint64) (count uint64, err error) {
 	return count, err
 }
 
-func GetVolExitCount(epoch uint64) (count uint64, err error) {
+func GetVolExitedCount(epoch uint64) (count uint64, err error) {
 	err = db.ReaderDb.Get(&count,
 		" select count(distinct bv.validatorindex) from blocks_voluntaryexits as bv "+
 			" join validators as v on bv.validatorindex = v.validatorindex "+

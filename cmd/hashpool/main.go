@@ -305,6 +305,7 @@ func main() {
 
 		// Withdrawal
 		apiV1Router.HandleFunc("/withdrawal/stats", handlers.ApiWithdrawalStats).Methods("GET", "OPTIONS")
+		apiV1Router.HandleFunc("/withdrawal/status/summary", handlers.ApiWithdrawalStatusSummary).Methods("GET", "OPTIONS")
 
 		apiV1Router.HandleFunc("/staking/stats", handlers.ApiValidatorsStats).Methods("GET", "OPTIONS")
 		apiV1Router.HandleFunc("/graffitiwall", handlers.ApiGraffitiwall).Methods("GET", "OPTIONS")

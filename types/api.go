@@ -720,8 +720,8 @@ type ApiWithdrawalStatisticResponse struct {
 type ApiWithdrawalStatusSummaryResponse struct {
 	Epoch                   uint64 `json:"epoch,omitempty"`
 	ExitingCount            uint64 `json:"exiting_count"`
-	ExitCount               uint64 `json:"exit_count"`
-	VolExitCount            uint64 `json:"vol_exit_count"`
+	ExitedCount             uint64 `json:"exited_count"`
+	VolExitedCount          uint64 `json:"vol_exited_count"`
 	WithdrawalFinishedCount uint64 `json:"withdrawal_finished_count"`
-	withdrawalAmount        uint64 `json:"withdrawal_amount"`
+	WithdrawalAmount        uint64 `json:"withdrawal_amount"`
 }

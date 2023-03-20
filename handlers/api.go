@@ -3861,3 +3861,90 @@ func ApiWithdrawalStats(w http.ResponseWriter, r *http.Request) {
 
 	sendOKResponse(j, r.URL.String(), []interface{}{statisticResp})
 }
+
+// ApiWithdrawalStatusSummary godoc
+// @Summary Get the eth2 withdrawal status summary
+// @Tags Withdrawal
+// @Description Returns the summary of the withdrawal status
+// @Produce  json
+// @Success 200 {object} types.ApiResponse{data=types.Stats}
+// @Failure 400 {object} types.ApiResponse
+// @Router /api/v1/withdrawal/status/summary [get]
+func ApiWithdrawalStatusSummary(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	j := json.NewEncoder(w)
+	statusSummary := &types.ApiWithdrawalStatusSummaryResponse{
+		Epoch:                   0,
+		ExitingCount:            0,
+		ExitedCount:             0,
+		VolExitedCount:          0,
+		WithdrawalFinishedCount: 0,
+		WithdrawalAmount:        0,
+	}
+	lastEpochs, err := services.GetLastEpoch()
+	if err != nil {
+		logger.Errorf("An error occurred when get lastest epoch data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	if len(lastEpochs) == 0 {
+		logger.Debugf("not found lastest epoch.")
+		sendOKResponse(j, r.URL.String(), []interface{}{statusSummary})
+		return
+	}
+
+	lastEpoch := lastEpochs[0]
+
+	// 获取正在退出中的Validator的数量
+	exitingCount, err := services.GetExitingCount(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get exiting validator count. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	statusSummary.ExitingCount = exitingCount
+
+	// 获取已退出（含退出提现的）的Validator的数量
+	exitedCount, err := services.GetExitedCount(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get exited validator count. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	statusSummary.ExitedCount = exitedCount
+
+	// 获取已退出（含已提现的）的Validator的数量
+	volExitedCount, err := services.GetVolExitedCount(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get vol exited validator count. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	statusSummary.VolExitedCount = volExitedCount
+
+	// 获取已提现的Validator的数量
+	withdrawalFinishedCount, err := services.GetWithdrawalFinishedCount(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get withdrawal finished validator count. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	statusSummary.WithdrawalFinishedCount = withdrawalFinishedCount
+
+	// 获取已提现的金额(仅已退出的Validator的最后一笔提现)
+	withdrawalFinishedAmount, err := services.GetWithdrawalFinishedAmount(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get withdrawal finished amount. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	statusSummary.WithdrawalAmount = withdrawalFinishedAmount
+
+	sendOKResponse(j, r.URL.String(), []interface{}{statusSummary})
+}
