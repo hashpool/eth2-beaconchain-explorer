@@ -1599,3 +1599,171 @@ func getBurnPageData() (*types.BurnPageData, error) {
 	logger.Infof("epoch burn page export took: %v seconds", time.Since(start).Seconds())
 	return data, nil
 }
+
+func GetLastEpoch() (epochs []types.EpochsData, err error) {
+	err = db.ReaderDb.Select(&epochs, "select epoch, blockscount, proposerslashingscount, attesterslashingscount, attestationscount, depositscount,"+
+		"withdrawalcount, voluntaryexitscount, validatorscount, averagevalidatorbalance, totalvalidatorbalance, finalized, eligibleether, globalparticipationrate,"+
+		"votedether  from epochs order by epoch desc limit 1")
+
+	return epochs, err
+}
+
+func GetWaitingActivationAmountLocked(epoch uint64) (activationLocked uint64, err error) {
+	err = db.ReaderDb.Get(&activationLocked,
+		"select sum(ed.amount) from eth1_deposits as ed "+
+			" left join validators as v on  encode(ed.publickey, 'hex') = v.pubkeyhex"+
+			" where (v.pubkeyhex is null and ed.valid_signature is true) "+
+			" or (v.pubkeyhex is not null and v.activationepoch > $1)", epoch)
+
+	return activationLocked, err
+}
+
+func GetExitedWaitingWithdrawAmountLocked(epoch uint64) (waitingWithdrawalLocked uint64, err error) {
+	err = db.ReaderDb.Get(&waitingWithdrawalLocked,
+		"select sum(balance) from validators "+
+			" where pubkeyhex is not null and exitepoch <= $1 and $1 < withdrawableepoch", epoch)
+
+	return waitingWithdrawalLocked, err
+}
+
+func GetWithdrawableNotFoundAddressAmountLocked(epoch uint64) (withdrawableNotFoundAddressLocked uint64, err error) {
+	err = db.ReaderDb.Get(&withdrawableNotFoundAddressLocked,
+		"select sum(balance) from validators "+
+			" where pubkeyhex is not null and exitepoch <= $1 and $1 >= withdrawableepoch "+
+			" and substring(encode(withdrawalcredentials,  'hex'),1,2) = '00'", epoch)
+
+	return withdrawableNotFoundAddressLocked, err
+}
+
+func GetTotalWaitingActivationValidators(epoch uint64) (waitingActivationCount uint64, err error) {
+	err = db.ReaderDb.Get(&waitingActivationCount,
+		" select count(distinct ed.publickey) from eth1_deposits as ed "+
+			" left join validators as v on  encode(ed.publickey, 'hex') = v.pubkeyhex "+
+			" where "+
+			" (v.pubkeyhex is null and ed.valid_signature is true) "+
+			" or "+
+			" (v.pubkeyhex is not null and v.activationepoch > $1)", epoch)
+
+	return waitingActivationCount, err
+}
+
+func GetPendingDepositCount() (count uint64, err error) {
+	err = db.ReaderDb.Get(&count,
+		" select count(distinct ed.publickey) from eth1_deposits as ed "+
+			" left join validators as v on  encode(ed.publickey, 'hex') = v.pubkeyhex "+
+			" where v.pubkeyhex is null and ed.valid_signature is true")
+
+	return count, err
+}
+
+func GetDepositedCount(epoch uint64) (count uint64, err error) {
+	err = db.ReaderDb.Get(&count,
+		" select count(*) from validators as v "+
+			" where  v.activationeligibilityepoch > $1", epoch)
+
+	return count, err
+}
+
+func GetPendingCount(epoch uint64) (count uint64, err error) {
+	err = db.ReaderDb.Get(&count,
+		" select count(*) from validators as v "+
+			" where v.activationepoch > $1 and v.activationeligibilityepoch <= $1", epoch)
+
+	return count, err
+}
+
+func GetEstimateStakingWaitTime(epoch uint64) (estimateStakingWaitTime uint64) {
+	return estimateStakingWaitTime
+}
+
+func GetWithdrawnAmount() (amount uint64, err error) {
+	err = db.ReaderDb.Get(&amount, " select sum(amount) from blocks_withdrawals ")
+
+	return amount, err
+}
+
+func GetActivationWaitingWithdrawalAmount(epoch uint64) (amount uint64, err error) {
+	err = db.ReaderDb.Get(&amount, " select sum(balance - 32 * 1e9) from validators "+
+		"where substring(encode(withdrawalcredentials,  'hex'),1,2) != '00' "+
+		" and activationepoch <= $1 and $1 < exitepoch "+
+		" and balance > 32 * 1e9 ", epoch)
+
+	return amount, err
+}
+
+func GetExitedWaitingWithdrawalAmount(epoch uint64) (amount uint64, err error) {
+	err = db.ReaderDb.Get(&amount, " select sum(balance) from validators "+
+		"where substring(encode(withdrawalcredentials,  'hex'),1,2) != '00' "+
+		" and exitepoch <= $1 and $1 < withdrawableepoch ", epoch)
+
+	return amount, err
+}
+
+func GetUnAddressWaitingWithdrawalAmount(epoch uint64) (amount uint64, err error) {
+	err = db.ReaderDb.Get(&amount, " select sum(balance) from validators "+
+		"where substring(encode(withdrawalcredentials,  'hex'),1,2) = '00' "+
+		" and $1 >= withdrawableepoch ", epoch)
+
+	return amount, err
+}
+
+func GetBLSData(epoch uint64) (data types.BLSData, err error) {
+	err = db.ReaderDb.Get(&data,
+		" select sum(case when substring(encode(withdrawalcredentials,  'hex'),1,2) != '00' then 1 else 0 end) as blsvalidatorcount, "+
+			" round(sum(case when substring(encode(withdrawalcredentials,  'hex'),1,2) != '00' then 1 else 0 end) * 1.0 / count(*), 4) as blsvalidatorrate "+
+			" from validators "+
+			" where activationepoch <= $1 ", epoch)
+
+	return data, err
+}
+
+func GetEstimateWithdrawalWaitTime(epoch uint64) (estimateWithdrawalWaitTime uint64) {
+	return estimateWithdrawalWaitTime
+}
+
+func GetExitingCount(epoch uint64) (count uint64, err error) {
+	err = db.ReaderDb.Get(&count,
+		" select count(*) from validators as v "+
+			" where v.exitepoch != 9223372036854775807 and v.activationepoch <= $1 and v.exitepoch > $1", epoch)
+
+	return count, err
+}
+
+func GetExitedCount(epoch uint64) (count uint64, err error) {
+	err = db.ReaderDb.Get(&count,
+		" select count(*) from validators as v "+" where v.exitepoch <= $1", epoch)
+
+	return count, err
+}
+
+func GetVolExitedCount(epoch uint64) (count uint64, err error) {
+	err = db.ReaderDb.Get(&count,
+		" select count(distinct bv.validatorindex) from blocks_voluntaryexits as bv "+
+			" join validators as v on bv.validatorindex = v.validatorindex "+
+			" where v.exitepoch <= $1", epoch)
+
+	return count, err
+}
+
+func GetWithdrawalFinishedCount(epoch uint64) (count uint64, err error) {
+	err = db.ReaderDb.Get(&count,
+		" select count(*) from validators as v "+
+			"where substring(encode(v.withdrawalcredentials, 'hex'),1,2) != '00' and $1 >= withdrawableepoch", epoch)
+
+	return count, err
+}
+
+func GetWithdrawalFinishedAmount(epoch uint64) (amount uint64, err error) {
+	err = db.ReaderDb.Get(&amount,
+		" select sum(amount) from ( "+" "+
+			"select validatorindex, amount, block_slot, "+
+			" 		row_number() over(partition by validatorindex  order by block_slot desc) as rn "+
+			"from blocks_withdrawals where validatorindex in ( "+
+			" 					select validatorindex from validators "+
+			"					where substring(encode(withdrawalcredentials,  'hex'),1,2) != '00' and $1 >= withdrawableepoch"+
+			"					) "+
+			") as t "+
+			"where rn = 1 ", epoch)
+
+	return amount, err
+}

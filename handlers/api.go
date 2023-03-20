@@ -753,64 +753,63 @@ func ApiValidatorQueue(w http.ResponseWriter, r *http.Request) {
 // @Router /api/v1/validators/statussummary [get]
 func ApiValidatorsStatusSummary(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
-	// TODO(Leo): 需要走redis缓存, 或者参考 getRocketpoolStats()
 	j := json.NewEncoder(w)
-	validatorsPageData := types.ValidatorsPageData{}
-	validatorsPageData.PendingCount = 0
-	validatorsPageData.ActiveOnlineCount = 0
-	validatorsPageData.ActiveOfflineCount = 0
-	validatorsPageData.ActiveCount = 0
-	validatorsPageData.SlashingOnlineCount = 0
-	validatorsPageData.SlashingOfflineCount = 0
-	validatorsPageData.SlashingCount = 0
-	validatorsPageData.ExitingOnlineCount = 0
-	validatorsPageData.ExitingOfflineCount = 0
-	validatorsPageData.ExitedCount = 0
-	validatorsPageData.VoluntaryExitsCount = 0
-	validatorsPageData.DepositedCount = 0
-
-	var currentStateCounts []*states
-
-	qry := "SELECT status AS statename, COUNT(*) AS statecount FROM validators GROUP BY status"
-	err := db.ReaderDb.Select(&currentStateCounts, qry)
+	summaryResp := &types.ApiValidatorStatusSummaryResponse{
+		Epoch:               0,
+		PendingDepositCount: 0,
+		DepositedCount:      0,
+		PendingCount:        0,
+		ActivationCount:     0,
+	}
+	lastEpochs, err := services.GetLastEpoch()
 	if err != nil {
-		sendErrorResponse(w, r.URL.String(), "could not get validators status summary")
+		logger.Errorf("An error occurred when get lastest epoch data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
 		return
 	}
 
-	for _, state := range currentStateCounts {
-		switch state.Name {
-		case "pending":
-			validatorsPageData.PendingCount = state.Count
-		case "active_online":
-			validatorsPageData.ActiveOnlineCount = state.Count
-		case "active_offline":
-			validatorsPageData.ActiveOfflineCount = state.Count
-		case "slashing_online":
-			validatorsPageData.SlashingOnlineCount = state.Count
-		case "slashing_offline":
-			validatorsPageData.SlashingOfflineCount = state.Count
-		case "slashed":
-			validatorsPageData.Slashed = state.Count
-		case "exiting_online":
-			validatorsPageData.ExitingOnlineCount = state.Count
-		case "exiting_offline":
-			validatorsPageData.ExitingOfflineCount = state.Count
-		case "exited":
-			validatorsPageData.VoluntaryExitsCount = state.Count
-		case "deposited":
-			validatorsPageData.DepositedCount = state.Count
-		}
+	if len(lastEpochs) == 0 {
+		logger.Debugf("not found lastest epoch.")
+		sendOKResponse(j, r.URL.String(), []interface{}{summaryResp})
+		return
 	}
 
-	validatorsPageData.ActiveCount = validatorsPageData.ActiveOnlineCount + validatorsPageData.ActiveOfflineCount
-	validatorsPageData.SlashingCount = validatorsPageData.SlashingOnlineCount + validatorsPageData.SlashingOfflineCount
-	validatorsPageData.ExitingCount = validatorsPageData.ExitingOnlineCount + validatorsPageData.ExitingOfflineCount
-	validatorsPageData.ExitedCount = validatorsPageData.VoluntaryExitsCount + validatorsPageData.Slashed
-	validatorsPageData.TotalCount = validatorsPageData.ActiveCount + validatorsPageData.ExitingCount + validatorsPageData.ExitedCount + validatorsPageData.PendingCount + validatorsPageData.DepositedCount
+	lastEpoch := lastEpochs[0]
 
-	sendOKResponse(j, r.URL.String(), []interface{}{validatorsPageData})
+	// 获取所有活跃的Validators数量
+	summaryResp.ActivationCount = lastEpoch.ValidatorsCount
+
+	// 获取所有的PendingDeposit的数量
+	pendingDeposit, err := services.GetPendingDepositCount()
+	if err != nil {
+		logger.Errorf("An error occurred when get pending deposit data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	summaryResp.PendingDepositCount = pendingDeposit
+
+	// 获取所有的Deposited的数量
+	deposited, err := services.GetDepositedCount(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get deposited data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	summaryResp.DepositedCount = deposited
+
+	// 获取所有的Pending的数量
+	pending, err := services.GetPendingCount(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get pending data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	summaryResp.PendingCount = pending
+
+	sendOKResponse(j, r.URL.String(), []interface{}{summaryResp})
 }
 
 // ApiValidatorsStats godoc
@@ -3638,24 +3637,6 @@ func parseApiValidatorParamToIndices(origParam string, limit int) (indices []uin
 	return queryIndicesDeduped, nil
 }
 
-// ApiStakingStats godoc
-// @Summary Get the eth2 staking stats
-// @Tags Staking
-// @Description Returns the stats of the staking
-// @Produce  json
-// @Success 200 {object} types.ApiResponse{data=types.Stats}
-// @Failure 400 {object} types.ApiResponse
-// @Router /api/v1/staking/stats [get]
-func ApiStakingStats(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	// Total ETH amount locked
-
-	j := json.NewEncoder(w)
-	stats := services.GetLatestStats()
-	sendOKResponse(j, r.URL.String(), []interface{}{stats})
-}
-
 func parseApiValidatorParamToPubkeys(origParam string, limit int) (pubkeys pq.ByteaArray, err error) {
 	var indices pq.Int64Array
 	params := strings.Split(origParam, ",")
@@ -3704,4 +3685,266 @@ func parseApiValidatorParamToPubkeys(origParam string, limit int) (pubkeys pq.By
 	}
 
 	return queryIndicesDeduped, nil
+}
+
+// ApiStakingStats godoc
+// @Summary Get the eth2 staking stats
+// @Tags Staking
+// @Description Returns the stats of the staking
+// @Produce  json
+// @Success 200 {object} types.ApiResponse{data=types.Stats}
+// @Failure 400 {object} types.ApiResponse
+// @Router /api/v1/staking/stats [get]
+func ApiStakingStats(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	j := json.NewEncoder(w)
+	statisticResp := &types.ApiStakingStatisticResponse{
+		Epoch:                  0,
+		TotalAmountLocked:      0,
+		TotalActiveValidators:  0,
+		TotalWaitingValidators: 0,
+		StakingWaitTime:        0,
+		StakingRate:            float64(0),
+	}
+	lastEpochs, err := services.GetLastEpoch()
+	if err != nil {
+		logger.Errorf("An error occurred when get lastest epoch data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	if len(lastEpochs) == 0 {
+		logger.Debugf("not found lastest epoch.")
+		sendOKResponse(j, r.URL.String(), []interface{}{statisticResp})
+		return
+	}
+
+	lastEpoch := lastEpochs[0]
+
+	// 获取所有活跃的Validators的锁仓以太坊数量（Status: activation）
+	totalAmountLocked := lastEpoch.TotalValidatorBalance
+
+	// 获取所有等待激活的Validators的锁仓以太坊数量 (Status: deposited and pending）
+	waitingActivationAmountLocked, err := services.GetWaitingActivationAmountLocked(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when waiting activation amount locked data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	totalAmountLocked = totalAmountLocked + waitingActivationAmountLocked
+
+	// 获取所有已经退出但正在等待提现的锁仓以太坊数量 (Status: exited and waiting withdrawal）
+	exitedWaitingWithdrawAmountLocked, err := services.GetExitedWaitingWithdrawAmountLocked(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when waiting withdrawal amount locked data after exited. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+	totalAmountLocked = totalAmountLocked + exitedWaitingWithdrawAmountLocked
+
+	// 获取所有已经可以提现但未配置提现地址的锁仓以太坊数量 (Status: withdrawable but not found withdrawal address）
+	withdrawableNotFoundAddressAmountLocked, err := services.GetWithdrawableNotFoundAddressAmountLocked(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when withdrawable but not found address amount locked data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+	totalAmountLocked = totalAmountLocked + withdrawableNotFoundAddressAmountLocked
+
+	// 获取所有等待激活的验证者数量
+	totalWaitingValidators, err := services.GetTotalWaitingActivationValidators(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get waiting (deposited and pending) activation validator count. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	estimateStakingWaitTime := services.GetEstimateStakingWaitTime(lastEpoch.Epoch)
+
+	statisticResp.TotalAmountLocked = totalAmountLocked
+	statisticResp.TotalActiveValidators = lastEpoch.ValidatorsCount
+	statisticResp.TotalWaitingValidators = totalWaitingValidators
+	statisticResp.StakingWaitTime = estimateStakingWaitTime
+	statisticResp.StakingRate = lastEpoch.GlobalParticipationRate
+
+	sendOKResponse(j, r.URL.String(), []interface{}{statisticResp})
+}
+
+// ApiWithdrawalStats godoc
+// @Summary Get the eth2 withdrawal stats
+// @Tags Withdrawal
+// @Description Returns the stats of the withdrawal
+// @Produce  json
+// @Success 200 {object} types.ApiResponse{data=types.Stats}
+// @Failure 400 {object} types.ApiResponse
+// @Router /api/v1/withdrawal/stats [get]
+func ApiWithdrawalStats(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	j := json.NewEncoder(w)
+	statisticResp := &types.ApiWithdrawalStatisticResponse{
+		Epoch:                   0,
+		WithdrawnAmount:         0,
+		WaitingWithdrawalAmount: 0,
+		BLSValidatorCount:       0,
+		BLSValidatorRate:        float64(0),
+		WithdrawalWaitTime:      0,
+	}
+	lastEpochs, err := services.GetLastEpoch()
+	if err != nil {
+		logger.Errorf("An error occurred when get lastest epoch data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	if len(lastEpochs) == 0 {
+		logger.Debugf("not found lastest epoch.")
+		sendOKResponse(j, r.URL.String(), []interface{}{statisticResp})
+		return
+	}
+
+	lastEpoch := lastEpochs[0]
+
+	// 获取所有已提现的ETH数量
+	withdrawalAmount, err := services.GetWithdrawnAmount()
+	if err != nil {
+		logger.Errorf("An error occurred when get withdrawal amount data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	statisticResp.WithdrawnAmount = withdrawalAmount
+
+	// 获取所有正在验证的验证者等待提现的ETH数量
+	activationWaitingWithdrawalAmount, err := services.GetActivationWaitingWithdrawalAmount(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get activation waiting withdrawal amount data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	waitingWithdrawalAmount := activationWaitingWithdrawalAmount
+
+	// 获取所有已经退出的验证者等待提现的ETH数量
+	exitedWaitingWithdrawalAmount, err := services.GetExitedWaitingWithdrawalAmount(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get exited waiting withdrawal amount data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	waitingWithdrawalAmount = waitingWithdrawalAmount + exitedWaitingWithdrawalAmount
+
+	// 获取所有已退出可提现但未配置提现地址等待提现的ETH数量
+	unAddressWaitingWithdrawalAmount, err := services.GetUnAddressWaitingWithdrawalAmount(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get not config withdrawal address amount data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	waitingWithdrawalAmount = waitingWithdrawalAmount + unAddressWaitingWithdrawalAmount
+
+	statisticResp.WaitingWithdrawalAmount = waitingWithdrawalAmount
+
+	blsData, err := services.GetBLSData(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get bls data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	statisticResp.BLSValidatorCount = blsData.BLSValidatorCount
+	statisticResp.BLSValidatorRate = blsData.BLSValidatorRate
+
+	statisticResp.WithdrawalWaitTime = services.GetEstimateWithdrawalWaitTime(lastEpoch.Epoch)
+
+	sendOKResponse(j, r.URL.String(), []interface{}{statisticResp})
+}
+
+// ApiWithdrawalStatusSummary godoc
+// @Summary Get the eth2 withdrawal status summary
+// @Tags Withdrawal
+// @Description Returns the summary of the withdrawal status
+// @Produce  json
+// @Success 200 {object} types.ApiResponse{data=types.Stats}
+// @Failure 400 {object} types.ApiResponse
+// @Router /api/v1/withdrawal/status/summary [get]
+func ApiWithdrawalStatusSummary(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	j := json.NewEncoder(w)
+	statusSummary := &types.ApiWithdrawalStatusSummaryResponse{
+		Epoch:                   0,
+		ExitingCount:            0,
+		ExitedCount:             0,
+		VolExitedCount:          0,
+		WithdrawalFinishedCount: 0,
+		WithdrawalAmount:        0,
+	}
+	lastEpochs, err := services.GetLastEpoch()
+	if err != nil {
+		logger.Errorf("An error occurred when get lastest epoch data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	if len(lastEpochs) == 0 {
+		logger.Debugf("not found lastest epoch.")
+		sendOKResponse(j, r.URL.String(), []interface{}{statusSummary})
+		return
+	}
+
+	lastEpoch := lastEpochs[0]
+
+	// 获取正在退出中的Validator的数量
+	exitingCount, err := services.GetExitingCount(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get exiting validator count. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	statusSummary.ExitingCount = exitingCount
+
+	// 获取已退出（含退出提现的）的Validator的数量
+	exitedCount, err := services.GetExitedCount(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get exited validator count. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	statusSummary.ExitedCount = exitedCount
+
+	// 获取已退出（含已提现的）的Validator的数量
+	volExitedCount, err := services.GetVolExitedCount(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get vol exited validator count. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	statusSummary.VolExitedCount = volExitedCount
+
+	// 获取已提现的Validator的数量
+	withdrawalFinishedCount, err := services.GetWithdrawalFinishedCount(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get withdrawal finished validator count. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	statusSummary.WithdrawalFinishedCount = withdrawalFinishedCount
+
+	// 获取已提现的金额(仅已退出的Validator的最后一笔提现)
+	withdrawalFinishedAmount, err := services.GetWithdrawalFinishedAmount(lastEpoch.Epoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get withdrawal finished amount. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
+	statusSummary.WithdrawalAmount = withdrawalFinishedAmount
+
+	sendOKResponse(j, r.URL.String(), []interface{}{statusSummary})
 }

@@ -1902,3 +1902,26 @@ type BroadcastStatusPageData struct {
 	JobJson      string
 	Validators   *[]NodeJobValidatorInfo
 }
+
+type EpochsData struct {
+	Epoch                   uint64  `db:"epoch"`
+	BlocksCount             uint64  `db:"blockscount"`
+	ProposerSlashingsCount  uint64  `db:"proposerslashingscount"`
+	AttesterSlashingsCount  uint64  `db:"attesterslashingscount"`
+	AttestationsCount       uint64  `db:"attestationscount"`
+	DepositsCount           uint64  `db:"depositscount"`
+	WithdrawalCount         uint64  `db:"withdrawalcount"`
+	VoluntaryExitsCount     uint64  `db:"voluntaryexitscount"`
+	ValidatorsCount         uint64  `db:"validatorscount"`
+	AverageValidatorBalance uint64  `db:"averagevalidatorbalance"`
+	TotalValidatorBalance   uint64  `db:"totalvalidatorbalance"`
+	Finalized               bool    `db:"finalized"`
+	EligibleEther           uint64  `db:"eligibleether"`
+	GlobalParticipationRate float64 `db:"globalparticipationrate"`
+	VotedEther              uint64  `db:"votedether"`
+}
+
+type BLSData struct {
+	BLSValidatorCount uint64  `db:"blsvalidatorcount"`
+	BLSValidatorRate  float64 `db:"blsvalidatorrate"`
+}
