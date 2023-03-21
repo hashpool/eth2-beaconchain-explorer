@@ -3859,10 +3859,16 @@ func ApiWithdrawalStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	withdrawalWaitTime, err := services.GetEstimateWithdrawalWaitTime(lastEpoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get estimate withdrawal wait time data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
+
 	statisticResp.BLSValidatorCount = blsData.BLSValidatorCount
 	statisticResp.BLSValidatorRate = blsData.BLSValidatorRate
-
-	statisticResp.WithdrawalWaitTime = services.GetEstimateWithdrawalWaitTime(lastEpoch.Epoch)
+	statisticResp.WithdrawalWaitTime = withdrawalWaitTime
 
 	sendOKResponse(j, r.URL.String(), []interface{}{statisticResp})
 }

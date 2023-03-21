@@ -1785,13 +1785,57 @@ func GetBLSData(epoch uint64) (data types.BLSData, err error) {
 	return data, err
 }
 
-func GetEstimateWithdrawalWaitTime(epoch uint64) (estimateWithdrawalWaitTime uint64) {
-	return estimateWithdrawalWaitTime
+func GetEstimateWithdrawalWaitTime(epoch types.EpochsData) (estimateWithdrawalWaitTime uint64, err error) {
+	estimateWithdrawalWaitTime = 0
+
+	// 获取所有正在退出的Validator的数量
+	exitingEpochs, err := GetExitingEpochs(epoch.Epoch)
+	if err != nil {
+		return estimateWithdrawalWaitTime, err
+	}
+
+	exitingEpochs = append(exitingEpochs, epoch.Epoch+1+4)
+
+	// 找到最大的 ExitEpoch
+	exitQueueEpoch := uint64(0)
+	for _, i := range exitingEpochs {
+		if exitQueueEpoch < i {
+			exitQueueEpoch = i
+		}
+	}
+
+	// 获取等于最大的ExitEpoch的Validator的数量
+	specExitEpochsCount, err := GetExitingCountByExitEpoch(epoch.Epoch, exitQueueEpoch)
+
+	activationCount := epoch.ValidatorsCount
+	churnLimit := GetValidatorChurnLimit(activationCount)
+
+	if specExitEpochsCount >= churnLimit {
+		exitQueueEpoch = exitQueueEpoch + 1
+	}
+
+	return (exitQueueEpoch + 256 - epoch.Epoch) * 32 * 12, nil
 }
 
 func GetExitingCount(epoch uint64) (count uint64, err error) {
 	err = db.ReaderDb.Get(&count,
 		" select count(*) from validators as v "+
+			" where v.exitepoch != 9223372036854775807 and v.activationepoch <= $1 and v.exitepoch > $1", epoch)
+
+	return count, err
+}
+
+func GetExitingCountByExitEpoch(epoch uint64, exitepoch uint64) (count uint64, err error) {
+	err = db.ReaderDb.Get(&count,
+		" select count(*) from validators as v "+
+			" where v.exitepoch = $2 and v.activationepoch <= $1 and v.exitepoch > $1", epoch, exitepoch)
+
+	return count, err
+}
+
+func GetExitingEpochs(epoch uint64) (count []uint64, err error) {
+	err = db.ReaderDb.Select(&count,
+		" select exitepoch from validators as v "+
 			" where v.exitepoch != 9223372036854775807 and v.activationepoch <= $1 and v.exitepoch > $1", epoch)
 
 	return count, err
