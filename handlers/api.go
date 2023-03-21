@@ -3760,7 +3760,12 @@ func ApiStakingStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	estimateStakingWaitTime := services.GetEstimateStakingWaitTime(lastEpoch.Epoch)
+	estimateStakingWaitTime, err := services.GetEstimateStakingWaitTime(lastEpoch)
+	if err != nil {
+		logger.Errorf("An error occurred when get estimate staking wait time data. err: %v", err)
+		sendServerErrorResponse(w, r.URL.String(), "Data exception")
+		return
+	}
 
 	statisticResp.TotalAmountLocked = totalAmountLocked
 	statisticResp.TotalActiveValidators = lastEpoch.ValidatorsCount

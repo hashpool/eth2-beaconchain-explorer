@@ -1672,8 +1672,76 @@ func GetPendingCount(epoch uint64) (count uint64, err error) {
 	return count, err
 }
 
-func GetEstimateStakingWaitTime(epoch uint64) (estimateStakingWaitTime uint64) {
-	return estimateStakingWaitTime
+func GetEstimateStakingWaitTime(epoch types.EpochsData) (estimateStakingWaitTime uint64, err error) {
+	// 从Deposited到Pending的状态需要2048个eth1的block + 64个eth2的epoch
+	estimateStakingWaitTime = 2048*12 + 64*32*12
+	estimateStakingEpoch := 2048/32 + 64
+
+	// 正在质押的验证者数量
+	depositedCount, err := GetDepositedCount(epoch.Epoch)
+	if err != nil {
+		return estimateStakingWaitTime, err
+	}
+
+	// 正在等待排队的验证者数量
+	pendingCount, err := GetPendingCount(epoch.Epoch)
+	if err != nil {
+		return estimateStakingWaitTime, err
+	}
+
+	curEpoch := epoch.Epoch
+	activationCount := epoch.ValidatorsCount
+	candidateCount := depositedCount + pendingCount
+	limit := candidateCount
+
+	// deposit-> pending的这段时间有多少个validator在排队
+	for stakingEpoch := 0; stakingEpoch < estimateStakingEpoch; stakingEpoch++ {
+		churnLimit := GetValidatorChurnLimit(activationCount)
+		var _limit uint64
+		if churnLimit < limit {
+			_limit = churnLimit
+		} else {
+			_limit = limit
+		}
+		curEpoch = curEpoch + uint64(stakingEpoch) + 1
+		activationCount = activationCount + _limit
+		candidateCount = candidateCount - _limit
+		limit = candidateCount
+		if limit == 0 {
+			break
+		}
+	}
+
+	activationEpoch := uint64(estimateStakingEpoch) + 1 + 4
+
+	_epoch := 0
+
+	// 当状态变更为pending时，有多少个validator在排队
+	for candidateCount > 0 {
+		churnLimit := GetValidatorChurnLimit(activationCount)
+		var _limit uint64
+		if churnLimit < limit {
+			_limit = churnLimit
+		} else {
+			_limit = limit
+		}
+		_epoch = _epoch + 1
+		activationCount = activationCount + _limit
+		candidateCount = candidateCount - _limit
+		limit = candidateCount
+	}
+
+	activationEpoch = activationEpoch + uint64(_epoch)
+
+	return activationEpoch * 32 * 12, nil
+}
+
+func GetValidatorChurnLimit(activeValidatorCount uint64) uint64 {
+	churnLimit := activeValidatorCount / 65536
+	if churnLimit < 4 {
+		churnLimit = 4
+	}
+	return churnLimit
 }
 
 func GetWithdrawnAmount() (amount uint64, err error) {
