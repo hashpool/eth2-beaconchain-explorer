@@ -743,12 +743,32 @@ func ApiValidatorQueue(w http.ResponseWriter, r *http.Request) {
 	returnQueryResults(rows, w, r)
 }
 
+// ApiSummary godoc
+// @Summary Get the current summary
+// @Tags Summary
+// @Description Returns the current epoch and slot and so on ...
+// @Produce  json
+// @Success 200 {object} types.ApiResponse{data=types.ApiSummaryResponse}
+// @Failure 400 {object} types.ApiResponse
+// @Router /api/v1/summary [get]
+func ApiSummary(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	j := json.NewEncoder(w)
+	summaryResp := &types.ApiSummaryResponse{
+		Epoch: services.LatestEpoch(),
+		Slot:  services.LatestSlot(),
+	}
+
+	sendOKResponse(j, r.URL.String(), []interface{}{summaryResp})
+}
+
 // ApiValidatorsStatusSummary godoc
 // @Summary Get the all validators status summary
 // @Tags Validator
 // @Description Returns the summary value of the various status of the validators
 // @Produce  json
-// @Success 200 {object} types.ApiResponse{data=types.ValidatorsPageData}
+// @Success 200 {object} types.ApiResponse{data=types.ApiValidatorStatusSummaryResponse}
 // @Failure 400 {object} types.ApiResponse
 // @Router /api/v1/validators/statussummary [get]
 func ApiValidatorsStatusSummary(w http.ResponseWriter, r *http.Request) {
@@ -3692,7 +3712,7 @@ func parseApiValidatorParamToPubkeys(origParam string, limit int) (pubkeys pq.By
 // @Tags Staking
 // @Description Returns the stats of the staking
 // @Produce  json
-// @Success 200 {object} types.ApiResponse{data=types.Stats}
+// @Success 200 {object} types.ApiResponse{data=types.ApiStakingStatisticResponse}
 // @Failure 400 {object} types.ApiResponse
 // @Router /api/v1/staking/stats [get]
 func ApiStakingStats(w http.ResponseWriter, r *http.Request) {
@@ -3781,7 +3801,7 @@ func ApiStakingStats(w http.ResponseWriter, r *http.Request) {
 // @Tags Withdrawal
 // @Description Returns the stats of the withdrawal
 // @Produce  json
-// @Success 200 {object} types.ApiResponse{data=types.Stats}
+// @Success 200 {object} types.ApiResponse{data=types.ApiWithdrawalStatisticResponse}
 // @Failure 400 {object} types.ApiResponse
 // @Router /api/v1/withdrawal/stats [get]
 func ApiWithdrawalStats(w http.ResponseWriter, r *http.Request) {
@@ -3878,7 +3898,7 @@ func ApiWithdrawalStats(w http.ResponseWriter, r *http.Request) {
 // @Tags Withdrawal
 // @Description Returns the summary of the withdrawal status
 // @Produce  json
-// @Success 200 {object} types.ApiResponse{data=types.Stats}
+// @Success 200 {object} types.ApiResponse{data=types.ApiWithdrawalStatusSummaryResponse}
 // @Failure 400 {object} types.ApiResponse
 // @Router /api/v1/withdrawal/status/summary [get]
 func ApiWithdrawalStatusSummary(w http.ResponseWriter, r *http.Request) {

@@ -725,3 +725,9 @@ type ApiWithdrawalStatusSummaryResponse struct {
 	WithdrawalFinishedCount uint64 `json:"withdrawal_finished_count"`
 	WithdrawalAmount        uint64 `json:"withdrawal_amount"`
 }
+
+// convert this json object to a golang struct called ApiSummaryResponse
+type ApiSummaryResponse struct {
+	Epoch uint64 `json:"epoch"`
+	Slot  uint64 `json:"slot"`
+}

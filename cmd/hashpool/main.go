@@ -297,6 +297,9 @@ func main() {
 		apiV1Router.HandleFunc("/validator/eth1/{address}", handlers.ApiValidatorByEth1Address).Methods("GET", "OPTIONS")
 		apiV1Router.HandleFunc("/validators/queue", handlers.ApiValidatorQueue).Methods("GET", "OPTIONS")
 
+		// Summary
+		apiV1Router.HandleFunc("/summary", handlers.ApiSummary).Methods("GET", "OPTIONS")
+
 		// Validator
 		apiV1Router.HandleFunc("/validators/statussummary", handlers.ApiValidatorsStatusSummary).Methods("GET", "OPTIONS")
 		apiV1Router.HandleFunc("/validators/stats", handlers.ApiValidatorsStats).Methods("GET", "OPTIONS")

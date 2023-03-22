@@ -1814,15 +1814,15 @@ func GetEstimateWithdrawalWaitTime(epoch types.EpochsData) (estimateWithdrawalWa
 		exitQueueEpoch = exitQueueEpoch + 1
 	}
 
-	avgTime, err := GetEstimateAvgWithdrawalQueueTime(epoch.Epoch)
+	possibleWithdrawalCount, err := GetPossibleWithdrawalValidatorCount(epoch.Epoch)
 	if err != nil {
 		return estimateWithdrawalWaitTime, err
 	}
 
-	return (exitQueueEpoch+256-epoch.Epoch)*32*12 + avgTime, nil
+	return (exitQueueEpoch+256-epoch.Epoch)*32*12 + uint64(math.Ceil(float64(possibleWithdrawalCount)/16.0/2.0))*12, nil
 }
 
-// 当可提现( > withdrawableepoch)之后，需要多久才能收到ETH
+// 当可提现( > withdrawableepoch)之后，需要多久才能收到ETH，计算的是最近一些提现成功的平均值
 func GetEstimateAvgWithdrawalQueueTime(epoch uint64) (uint64, error) {
 	var avgSlot float64
 	err := db.ReaderDb.Get(&avgSlot,
@@ -1852,6 +1852,15 @@ func GetEstimateAvgWithdrawalQueueTime(epoch uint64) (uint64, error) {
 	}
 
 	return uint64(math.Ceil(avgSlot * 12)), err
+}
+
+func GetPossibleWithdrawalValidatorCount(epoch uint64) (count uint64, err error) {
+	err = db.ReaderDb.Get(&count, " select count(*) from validators "+
+		" where substring(encode(withdrawalcredentials,  'hex'),1,2) != '00' "+
+		" and $1 >= activationepoch "+
+		" and effectivebalance > 0 ", epoch)
+
+	return count, err
 }
 
 func GetExitingCount(epoch uint64) (count uint64, err error) {
