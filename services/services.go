@@ -1814,7 +1814,44 @@ func GetEstimateWithdrawalWaitTime(epoch types.EpochsData) (estimateWithdrawalWa
 		exitQueueEpoch = exitQueueEpoch + 1
 	}
 
-	return (exitQueueEpoch + 256 - epoch.Epoch) * 32 * 12, nil
+	avgTime, err := GetEstimateAvgWithdrawalQueueTime(epoch.Epoch)
+	if err != nil {
+		return estimateWithdrawalWaitTime, err
+	}
+
+	return (exitQueueEpoch+256-epoch.Epoch)*32*12 + avgTime, nil
+}
+
+// 当可提现( > withdrawableepoch)之后，需要多久才能收到ETH
+func GetEstimateAvgWithdrawalQueueTime(epoch uint64) (uint64, error) {
+	var avgSlot float64
+	err := db.ReaderDb.Get(&avgSlot,
+		"select avg(withdrawal_slot) from ( "+
+			"			select block_slot - withdrawableepoch * 32 as withdrawal_slot"+
+			"			from (	"+
+			"					select "+
+			"						bw.validatorindex,"+
+			"						bw.block_slot,"+
+			"						bw.amount,"+
+			"						v.withdrawableepoch,"+
+			"						bbc.block_slot as bls_block_slot,"+
+			"						row_number() over(partition by bw.validatorindex  order by bw.block_slot desc) as rn"+
+			"					from blocks_withdrawals as bw "+
+			"					join validators as v on bw.validatorindex = v.validatorindex"+
+			"					left join blocks_bls_change as bbc on v.validatorindex = bbc.validatorindex"+
+			"					where v.withdrawableepoch <= $1 and v.effectivebalance = 0"+
+			"					and (bbc.block_slot is null  or ( bbc.block_slot is not null and bbc.block_slot < v.withdrawableepoch))"+
+			"				) as t "+
+			"			where rn = 1"+
+			"			order by block_slot desc"+
+			"			limit 100"+
+			" ) as tt", epoch)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return uint64(math.Ceil(avgSlot * 12)), err
 }
 
 func GetExitingCount(epoch uint64) (count uint64, err error) {
