@@ -1745,7 +1745,7 @@ func GetValidatorChurnLimit(activeValidatorCount uint64) uint64 {
 }
 
 func GetWithdrawnAmount() (amount uint64, err error) {
-	err = db.ReaderDb.Get(&amount, " select sum(amount) from blocks_withdrawals ")
+	err = db.ReaderDb.Get(&amount, " select case when sum(amount) is NULL then 0 else  sum(amount) end from blocks_withdrawals ")
 
 	return amount, err
 }
@@ -1913,7 +1913,7 @@ func GetWithdrawalFinishedCount(epoch uint64) (count uint64, err error) {
 
 func GetWithdrawalFinishedAmount(epoch uint64) (amount uint64, err error) {
 	err = db.ReaderDb.Get(&amount,
-		" select sum(amount) from ( "+" "+
+		" select case when sum(amount) is NULL then 0 else sum(amount) end from ( "+" "+
 			"select validatorindex, amount, block_slot, "+
 			" 		row_number() over(partition by validatorindex  order by block_slot desc) as rn "+
 			"from blocks_withdrawals where validatorindex in ( "+
