@@ -1610,7 +1610,7 @@ func GetLastEpoch() (epochs []types.EpochsData, err error) {
 
 func GetWaitingActivationAmountLocked(epoch uint64) (activationLocked uint64, err error) {
 	err = db.ReaderDb.Get(&activationLocked,
-		"select case when sum(ed.amount) is NULL then 0 else sum(ed.amount) end from eth1_deposits as ed "+
+		"select COALESCE(sum(ed.amount),0) from eth1_deposits as ed "+
 			" left join validators as v on  encode(ed.publickey, 'hex') = v.pubkeyhex"+
 			" where (v.pubkeyhex is null and ed.valid_signature is true) "+
 			" or (v.pubkeyhex is not null and v.activationepoch > $1)", epoch)
@@ -1745,7 +1745,7 @@ func GetValidatorChurnLimit(activeValidatorCount uint64) uint64 {
 }
 
 func GetWithdrawnAmount() (amount uint64, err error) {
-	err = db.ReaderDb.Get(&amount, " select case when sum(amount) is NULL then 0 else  sum(amount) end from blocks_withdrawals ")
+	err = db.ReaderDb.Get(&amount, " select COALESCE(sum(amount),0) from blocks_withdrawals ")
 
 	return amount, err
 }
@@ -1913,7 +1913,7 @@ func GetWithdrawalFinishedCount(epoch uint64) (count uint64, err error) {
 
 func GetWithdrawalFinishedAmount(epoch uint64) (amount uint64, err error) {
 	err = db.ReaderDb.Get(&amount,
-		" select case when sum(amount) is NULL then 0 else sum(amount) end from ( "+" "+
+		" select COALESCE(sum(amount),0) from ( "+" "+
 			"select validatorindex, amount, block_slot, "+
 			" 		row_number() over(partition by validatorindex  order by block_slot desc) as rn "+
 			"from blocks_withdrawals where validatorindex in ( "+
